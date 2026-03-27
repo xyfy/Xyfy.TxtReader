@@ -64,9 +64,14 @@ const elements = {
 let resizeTimer = null;
 
 function detectPagesPerView() {
-  const isMobile = window.matchMedia("(max-width: 820px)").matches;
-  state.pagesPerView = isMobile ? 1 : 2;
-  elements.spreadShell.classList.toggle("is-single", isMobile);
+  const forceSingleByViewport = window.matchMedia("(max-width: 820px)").matches;
+  const spreadWidth = elements.spreadShell?.clientWidth || 0;
+  const minPageWidth = 420;
+  const forceSingleByContentWidth = spreadWidth > 0 && spreadWidth / 2 < minPageWidth;
+  const isSingle = forceSingleByViewport || forceSingleByContentWidth;
+
+  state.pagesPerView = isSingle ? 1 : 2;
+  elements.spreadShell.classList.toggle("is-single", isSingle);
 }
 
 function turnClassName() {
@@ -519,7 +524,13 @@ function toggleSidePanel() {
   const hidden = elements.appShell.classList.toggle("panel-hidden");
   elements.togglePanel.setAttribute("aria-pressed", String(hidden));
   // Re-paginate after transition completes so new page width is measured correctly
-  setTimeout(() => rebuildPages(), 250);
+  setTimeout(() => {
+    detectPagesPerView();
+    if (state.currentPageIndex % state.pagesPerView !== 0) {
+      state.currentPageIndex -= state.currentPageIndex % state.pagesPerView;
+    }
+    rebuildPages();
+  }, 250);
 }
 
 function toggleDebugPanel() {
