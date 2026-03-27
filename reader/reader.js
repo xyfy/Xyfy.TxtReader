@@ -21,6 +21,8 @@ const state = {
   book: null,
   bookmarks: [],
   pages: [],
+  debugEnabled: false,
+  lastPageDimensions: null,
   pagesPerView: 2,
   currentChapterIndex: 0,
   currentPageIndex: 0
@@ -51,7 +53,12 @@ const elements = {
   animationIntensity: document.getElementById("animation-intensity"),
   spreadShell: document.querySelector(".spread-shell"),
   appShell: document.querySelector(".app-shell"),
-  togglePanel: document.getElementById("toggle-panel")
+  togglePanel: document.getElementById("toggle-panel"),
+  debugToggle: document.getElementById("debug-toggle"),
+  debugPanel: document.getElementById("debug-panel"),
+  readerHeader: document.querySelector(".reader-header"),
+  readerFooter: document.querySelector(".reader-footer"),
+  readerShell: document.querySelector(".reader-shell")
 };
 
 function detectPagesPerView() {
@@ -200,6 +207,7 @@ function renderSpread() {
   elements.pageIndicator.textContent = `${spreadIndex} / ${spreadTotal}`;
   animateTurn();
   renderToc();
+  renderDebugPanel();
 }
 
 async function persistProgress() {
@@ -246,6 +254,79 @@ function getPageContentDimensions() {
   };
 }
 
+function estimateTargetChars(pageDimensions) {
+  if (!pageDimensions) {
+    return Math.max(700, Math.round(2200 - state.settings.fontSize * 45));
+  }
+
+  const lineHeightPx = state.settings.fontSize * (state.settings.lineHeight || 1.8);
+  const avgCharWidth = Math.max(8, pageDimensions.charWidth || state.settings.fontSize);
+  const charsPerLine = Math.floor((pageDimensions.width / avgCharWidth) * 0.93);
+  const linesPerPage = Math.floor(pageDimensions.height / lineHeightPx);
+  return Math.max(200, charsPerLine * linesPerPage);
+}
+
+function measureRenderedTextHeight(sourceEl, text) {
+  const probe = document.createElement("div");
+  const sourceStyle = window.getComputedStyle(sourceEl);
+  probe.style.position = "fixed";
+  probe.style.left = "-99999px";
+  probe.style.top = "0";
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  probe.style.width = `${sourceEl.clientWidth}px`;
+  probe.style.font = sourceStyle.font;
+  probe.style.lineHeight = sourceStyle.lineHeight;
+  probe.style.letterSpacing = sourceStyle.letterSpacing;
+  probe.style.wordBreak = sourceStyle.wordBreak;
+  probe.style.whiteSpace = sourceStyle.whiteSpace;
+  probe.style.padding = "0";
+  probe.style.margin = "0";
+  probe.style.border = "0";
+  probe.textContent = text || "";
+  document.body.append(probe);
+  const height = probe.scrollHeight;
+  probe.remove();
+  return height;
+}
+
+function renderDebugPanel() {
+  if (!state.debugEnabled || !elements.debugPanel) {
+    return;
+  }
+
+  const chapter = state.book?.chapters?.[state.currentChapterIndex];
+  const pageDimensions = state.lastPageDimensions;
+  const leftText = state.pages[state.currentPageIndex] || "";
+  const rightText = state.pagesPerView === 2 ? state.pages[state.currentPageIndex + 1] || "" : "";
+  const leftRenderedHeight = measureRenderedTextHeight(elements.leftPage, leftText);
+  const rightRenderedHeight = state.pagesPerView === 2 ? measureRenderedTextHeight(elements.rightPage, rightText) : 0;
+  const leftOverflow = leftRenderedHeight > elements.leftPage.clientHeight + 1;
+  const rightOverflow = state.pagesPerView === 2 ? rightRenderedHeight > elements.rightPage.clientHeight + 1 : false;
+
+  const viewportHeight = Math.round(window.innerHeight);
+  const shellHeight = Math.round(elements.readerShell.getBoundingClientRect().height);
+  const headerHeight = Math.round(elements.readerHeader.getBoundingClientRect().height);
+  const spreadHeight = Math.round(elements.spreadShell.getBoundingClientRect().height);
+  const footerHeight = Math.round(elements.readerFooter.getBoundingClientRect().height);
+  const estimatedTargetChars = estimateTargetChars(pageDimensions);
+
+  const rows = [
+    "[Pagination Debug]",
+    `chapter=${chapter?.title || "-"}`,
+    `pageIndex=${state.currentPageIndex}/${Math.max(0, state.pages.length - 1)} pagesPerView=${state.pagesPerView}`,
+    "",
+    `[layout] viewport=${viewportHeight}px shell=${shellHeight}px header=${headerHeight}px spread=${spreadHeight}px footer=${footerHeight}px`,
+    `[content-box] width=${pageDimensions?.width ?? "-"} height=${pageDimensions?.height ?? "-"} charWidth=${pageDimensions ? pageDimensions.charWidth.toFixed(2) : "-"}`,
+    `[estimate] targetChars=${estimatedTargetChars}`,
+    "",
+    `[left ] chars=${leftText.length} clientH=${elements.leftPage.clientHeight} renderedH=${leftRenderedHeight} overflow=${leftOverflow}`,
+    `[right] chars=${rightText.length} clientH=${elements.rightPage.clientHeight} renderedH=${rightRenderedHeight} overflow=${rightOverflow}`
+  ];
+
+  elements.debugPanel.textContent = rows.join("\n");
+}
+
 function rebuildPages() {
   const chapter = state.book?.chapters?.[state.currentChapterIndex];
   if (!chapter) {
@@ -254,7 +335,9 @@ function rebuildPages() {
     return;
   }
 
-  state.pages = paginateChapter(chapter.content, state.settings, getPageContentDimensions());
+  const pageDimensions = getPageContentDimensions();
+  state.lastPageDimensions = pageDimensions;
+  state.pages = paginateChapter(chapter.content, state.settings, pageDimensions);
   if (state.currentPageIndex >= state.pages.length) {
     state.currentPageIndex = 0;
   }
@@ -400,6 +483,16 @@ function toggleSidePanel() {
   setTimeout(() => rebuildPages(), 250);
 }
 
+function toggleDebugPanel() {
+  state.debugEnabled = !state.debugEnabled;
+  elements.debugPanel.classList.toggle("hidden", !state.debugEnabled);
+  elements.debugToggle.classList.toggle("active", state.debugEnabled);
+  elements.debugToggle.setAttribute("aria-pressed", String(state.debugEnabled));
+  if (state.debugEnabled) {
+    renderDebugPanel();
+  }
+}
+
 function bindEvents() {
   elements.fileInput.addEventListener("change", handleFileSelection);
   elements.librarySelect.addEventListener("change", (event) => {
@@ -421,6 +514,7 @@ function bindEvents() {
   });
   elements.bookmarkButton.addEventListener("click", addBookmark);
   elements.togglePanel.addEventListener("click", toggleSidePanel);
+  elements.debugToggle.addEventListener("click", toggleDebugPanel);
   elements.themeSelect.addEventListener("change", handleSettingsChange);
   elements.fontSelect.addEventListener("change", handleSettingsChange);
   elements.fontSize.addEventListener("input", handleSettingsChange);
@@ -428,15 +522,11 @@ function bindEvents() {
   elements.animationIntensity.addEventListener("input", handleSettingsChange);
 
   window.addEventListener("resize", () => {
-    const before = state.pagesPerView;
     detectPagesPerView();
-    if (before !== state.pagesPerView) {
-      if (state.currentPageIndex % state.pagesPerView !== 0) {
-        state.currentPageIndex -= state.currentPageIndex % state.pagesPerView;
-      }
-      renderSpread();
-      persistProgress();
+    if (state.currentPageIndex % state.pagesPerView !== 0) {
+      state.currentPageIndex -= state.currentPageIndex % state.pagesPerView;
     }
+    rebuildPages();
   });
 
   document.addEventListener("keydown", (event) => {
@@ -448,6 +538,11 @@ function bindEvents() {
     if (event.key === "Tab") {
       event.preventDefault();
       toggleSidePanel();
+    }
+
+    if (event.altKey && event.key.toLowerCase() === "d") {
+      event.preventDefault();
+      toggleDebugPanel();
     }
 
     if (event.key === "ArrowRight" || event.key.toLowerCase() === "j") {

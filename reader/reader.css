@@ -339,6 +339,33 @@ select {
   gap: 8px;
 }
 
+#debug-toggle.active {
+  background: var(--accent-color);
+  color: #fffaf0;
+}
+
+.debug-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(50vh, 420px);
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: auto;
+  background: rgba(40, 30, 20, 0.9);
+  color: #f8ecd8;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  white-space: pre-wrap;
+}
+
+.debug-panel.hidden {
+  display: none;
+}
+
 #font-size {
   accent-color: var(--accent-color);
 }
@@ -364,5 +391,12 @@ select {
 
   .right-page {
     display: none;
+  }
+
+  .debug-panel {
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+    max-height: 45vh;
   }
 }
