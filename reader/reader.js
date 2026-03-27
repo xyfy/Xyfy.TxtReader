@@ -21,6 +21,7 @@ const state = {
   book: null,
   bookmarks: [],
   pages: [],
+  pagesPerView: 2,
   currentChapterIndex: 0,
   currentPageIndex: 0
 };
@@ -45,8 +46,43 @@ const elements = {
   nextChapter: document.getElementById("next-chapter"),
   themeSelect: document.getElementById("theme-select"),
   fontSelect: document.getElementById("font-select"),
-  fontSize: document.getElementById("font-size")
+  fontSize: document.getElementById("font-size"),
+  animationStyle: document.getElementById("animation-style"),
+  animationIntensity: document.getElementById("animation-intensity"),
+  spreadShell: document.querySelector(".spread-shell")
 };
+
+function detectPagesPerView() {
+  const isMobile = window.matchMedia("(max-width: 820px)").matches;
+  state.pagesPerView = isMobile ? 1 : 2;
+  elements.spreadShell.classList.toggle("is-single", isMobile);
+}
+
+function turnClassName() {
+  if (state.settings.animationStyle === "none") {
+    return "";
+  }
+
+  const style = state.settings.animationStyle === "fade" ? "turn-fade" : "turn-slide";
+  const strength = Number(state.settings.animationIntensity || 2) >= 2 ? "hard" : "soft";
+  return `${style}-${strength}`;
+}
+
+function animateTurn() {
+  const className = turnClassName();
+  const targets = [elements.leftPage, elements.rightPage];
+  const allKnown = ["turn-slide-soft", "turn-slide-hard", "turn-fade-soft", "turn-fade-hard"];
+
+  for (const target of targets) {
+    target.classList.remove(...allKnown);
+    if (!className) {
+      continue;
+    }
+    // Force reflow to replay animation class on every page turn.
+    void target.offsetWidth;
+    target.classList.add(className);
+  }
+}
 
 function formatSize(size) {
   if (size < 1024 * 1024) {
@@ -141,14 +177,16 @@ function applySettings() {
   elements.themeSelect.value = state.settings.theme;
   elements.fontSelect.value = state.settings.fontFamily;
   elements.fontSize.value = String(state.settings.fontSize);
+  elements.animationStyle.value = state.settings.animationStyle || "slide";
+  elements.animationIntensity.value = String(state.settings.animationIntensity || 2);
 }
 
 function renderSpread() {
   const chapter = state.book?.chapters?.[state.currentChapterIndex];
   const left = state.pages[state.currentPageIndex] || "";
-  const right = state.pages[state.currentPageIndex + 1] || "";
-  const spreadIndex = Math.floor(state.currentPageIndex / 2) + 1;
-  const spreadTotal = Math.max(1, Math.ceil(state.pages.length / 2));
+  const right = state.pagesPerView === 2 ? state.pages[state.currentPageIndex + 1] || "" : "";
+  const spreadIndex = Math.floor(state.currentPageIndex / state.pagesPerView) + 1;
+  const spreadTotal = Math.max(1, Math.ceil(state.pages.length / state.pagesPerView));
 
   elements.bookTitle.textContent = state.book?.name || "Xyfy TXT Reader";
   elements.leftTitle.textContent = chapter?.title || "";
@@ -156,8 +194,9 @@ function renderSpread() {
   elements.leftPage.textContent = left || "当前页没有内容";
   elements.rightPage.textContent = right || "已经到本章末尾";
   elements.leftPage.classList.toggle("empty", !left);
-  elements.rightPage.classList.toggle("empty", !right);
+  elements.rightPage.classList.toggle("empty", !right && state.pagesPerView === 2);
   elements.pageIndicator.textContent = `${spreadIndex} / ${spreadTotal}`;
+  animateTurn();
   renderToc();
 }
 
@@ -186,8 +225,8 @@ function rebuildPages() {
   if (state.currentPageIndex >= state.pages.length) {
     state.currentPageIndex = 0;
   }
-  if (state.currentPageIndex % 2 !== 0) {
-    state.currentPageIndex -= 1;
+  if (state.currentPageIndex % state.pagesPerView !== 0) {
+    state.currentPageIndex -= state.currentPageIndex % state.pagesPerView;
   }
   renderSpread();
   persistProgress();
@@ -255,8 +294,8 @@ function nextPage() {
     return;
   }
 
-  if (state.currentPageIndex + 2 < state.pages.length) {
-    state.currentPageIndex += 2;
+  if (state.currentPageIndex + state.pagesPerView < state.pages.length) {
+    state.currentPageIndex += state.pagesPerView;
     renderSpread();
     persistProgress();
     return;
@@ -272,8 +311,8 @@ function prevPage() {
     return;
   }
 
-  if (state.currentPageIndex - 2 >= 0) {
-    state.currentPageIndex -= 2;
+  if (state.currentPageIndex - state.pagesPerView >= 0) {
+    state.currentPageIndex -= state.pagesPerView;
     renderSpread();
     persistProgress();
     return;
@@ -282,7 +321,7 @@ function prevPage() {
   if (state.currentChapterIndex > 0) {
     state.currentChapterIndex -= 1;
     rebuildPages();
-    state.currentPageIndex = Math.max(0, state.pages.length - (state.pages.length % 2 === 0 ? 2 : 1));
+    state.currentPageIndex = Math.max(0, state.pages.length - (state.pages.length % state.pagesPerView || state.pagesPerView));
     renderSpread();
     persistProgress();
   }
@@ -294,7 +333,7 @@ async function addBookmark() {
   }
 
   const chapter = state.book.chapters[state.currentChapterIndex];
-  const label = `${chapter.title} · 第 ${Math.floor(state.currentPageIndex / 2) + 1} 页组`;
+  const label = `${chapter.title} · 第 ${Math.floor(state.currentPageIndex / state.pagesPerView) + 1} 页组`;
   await saveBookmark({
     id: `${state.book.id}:${state.currentChapterIndex}:${state.currentPageIndex}`,
     bookId: state.book.id,
@@ -312,7 +351,9 @@ async function handleSettingsChange() {
     theme: elements.themeSelect.value,
     fontFamily: elements.fontSelect.value,
     fontSize: Number(elements.fontSize.value),
-    lineHeight: state.settings.lineHeight
+    lineHeight: state.settings.lineHeight,
+    animationStyle: elements.animationStyle.value,
+    animationIntensity: Number(elements.animationIntensity.value)
   };
   applySettings();
   await saveReaderSettings(state.settings);
@@ -342,6 +383,20 @@ function bindEvents() {
   elements.themeSelect.addEventListener("change", handleSettingsChange);
   elements.fontSelect.addEventListener("change", handleSettingsChange);
   elements.fontSize.addEventListener("input", handleSettingsChange);
+  elements.animationStyle.addEventListener("change", handleSettingsChange);
+  elements.animationIntensity.addEventListener("input", handleSettingsChange);
+
+  window.addEventListener("resize", () => {
+    const before = state.pagesPerView;
+    detectPagesPerView();
+    if (before !== state.pagesPerView) {
+      if (state.currentPageIndex % state.pagesPerView !== 0) {
+        state.currentPageIndex -= state.currentPageIndex % state.pagesPerView;
+      }
+      renderSpread();
+      persistProgress();
+    }
+  });
 
   document.addEventListener("keydown", (event) => {
     const target = event.target;
@@ -383,6 +438,7 @@ function bindEvents() {
 async function bootstrap() {
   state.settings = await getReaderSettings();
   state.books = await listBooks();
+  detectPagesPerView();
   applySettings();
   renderLibrary();
   renderBookmarks();

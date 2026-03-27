@@ -1,17 +1,50 @@
+const SENTENCE_BREAK = /[。！？!?；;，,、]\s*/g;
+
+function sentenceAwareCut(text, maxChars) {
+  if (text.length <= maxChars) {
+    return text.length;
+  }
+
+  const searchStart = Math.max(80, maxChars - 140);
+  const searchEnd = Math.min(text.length, maxChars + 120);
+  const windowText = text.slice(searchStart, searchEnd);
+  let best = -1;
+
+  for (const match of windowText.matchAll(SENTENCE_BREAK)) {
+    best = searchStart + (match.index ?? 0) + match[0].length;
+  }
+
+  if (best >= Math.floor(maxChars * 0.55)) {
+    return best;
+  }
+
+  return maxChars;
+}
+
 function splitParagraph(paragraph, maxChars) {
   if (paragraph.length <= maxChars) {
     return [paragraph];
   }
 
-  const parts = [];
-  let start = 0;
+  const chunks = [];
+  let rest = paragraph.trim();
 
-  while (start < paragraph.length) {
-    parts.push(paragraph.slice(start, start + maxChars));
-    start += maxChars;
+  while (rest.length > maxChars) {
+    const cut = sentenceAwareCut(rest, maxChars);
+    chunks.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trimStart();
   }
 
-  return parts;
+  if (rest.length) {
+    chunks.push(rest);
+  }
+
+  if (chunks.length > 1 && chunks[chunks.length - 1].length < Math.floor(maxChars * 0.35)) {
+    const tail = chunks.pop();
+    chunks[chunks.length - 1] = `${chunks[chunks.length - 1]}${tail ? ` ${tail}` : ""}`.trim();
+  }
+
+  return chunks;
 }
 
 export function paginateChapter(content, settings) {

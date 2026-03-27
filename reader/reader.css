@@ -190,6 +190,14 @@ select {
   min-height: 0;
 }
 
+.spread-shell.is-single {
+  grid-template-columns: 1fr;
+}
+
+.spread-shell.is-single .right-page {
+  display: none;
+}
+
 .paper-page {
   position: relative;
   display: flex;
@@ -235,6 +243,65 @@ select {
 
 .page-content.empty {
   color: var(--muted-color);
+}
+
+.page-content.turn-slide-soft {
+  animation: turn-slide-soft 220ms ease;
+}
+
+.page-content.turn-slide-hard {
+  animation: turn-slide-hard 320ms ease;
+}
+
+.page-content.turn-fade-soft {
+  animation: turn-fade-soft 220ms ease;
+}
+
+.page-content.turn-fade-hard {
+  animation: turn-fade-hard 360ms ease;
+}
+
+@keyframes turn-slide-soft {
+  from {
+    transform: translateX(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes turn-slide-hard {
+  from {
+    transform: translateX(24px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes turn-fade-soft {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes turn-fade-hard {
+  0% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 .reader-footer label {

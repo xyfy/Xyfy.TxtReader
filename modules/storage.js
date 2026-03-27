@@ -3,7 +3,9 @@ const DEFAULT_SETTINGS = {
   theme: "paper",
   fontFamily: '"Noto Serif SC", Georgia, serif',
   fontSize: 18,
-  lineHeight: 1.8
+  lineHeight: 1.8,
+  animationStyle: "slide",
+  animationIntensity: 2
 };
 const DATABASE_NAME = "xyfy-txt-reader";
 const DATABASE_VERSION = 1;

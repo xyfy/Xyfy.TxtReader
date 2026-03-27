@@ -1,0 +1,9 @@
+{
+  "name": "xyfy-txt-reader",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:paginator": "node tests/paginator.test.mjs"
+  }
+}
