@@ -256,6 +256,12 @@ export async function getProgress(bookId) {
   return winner;
 }
 
+export async function listAllProgress() {
+  return withStore("progress", "readonly", async (store) => {
+    return requestToPromise(store.getAll());
+  });
+}
+
 export async function listBookmarks(bookId) {
   return withStore("bookmarks", "readonly", async (store) => {
     const index = store.index("bookId");

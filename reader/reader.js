@@ -10,6 +10,7 @@ import {
   getProgress,
   getReaderSettings,
   importBackupSnapshot,
+  listAllProgress,
   listBookmarks,
   listBooks,
   saveBook,
@@ -44,6 +45,8 @@ const elements = {
   importBackup: document.getElementById("import-backup"),
   backupStatus: document.getElementById("backup-status"),
   librarySelect: document.getElementById("library-select"),
+  recentList: document.getElementById("recent-list"),
+  statsList: document.getElementById("stats-list"),
   tocList: document.getElementById("toc-list"),
   chapterCount: document.getElementById("chapter-count"),
   bookmarkList: document.getElementById("bookmark-list"),
@@ -70,6 +73,9 @@ const elements = {
   togglePanel: document.getElementById("toggle-panel"),
   immersiveToggle: document.getElementById("immersive-toggle"),
   immersiveExit: document.getElementById("immersive-exit"),
+  shortcutsToggle: document.getElementById("shortcuts-toggle"),
+  shortcutsOverlay: document.getElementById("shortcuts-overlay"),
+  shortcutsClose: document.getElementById("shortcuts-close"),
   debugToggle: document.getElementById("debug-toggle"),
   debugPanel: document.getElementById("debug-panel"),
   readerHeader: document.querySelector(".reader-header"),
@@ -80,6 +86,7 @@ const elements = {
 let resizeTimer = null;
 let modeHintTimer = null;
 let warmupTimer = null;
+let shortcutsOpen = false;
 
 function requestWarmupWork(callback) {
   if (typeof window.requestIdleCallback === "function") {
@@ -344,6 +351,74 @@ function setBackupStatus(message, isError = false) {
   elements.backupStatus.style.color = isError ? "#b5442a" : "";
 }
 
+async function refreshRecentReads() {
+  const [progressList, books] = await Promise.all([listAllProgress(), listBooks()]);
+  const bookMap = new Map(books.map((book) => [book.id, book]));
+  const recentEntries = progressList
+    .filter((item) => bookMap.has(item.bookId))
+    .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
+    .slice(0, 5);
+
+  elements.recentList.innerHTML = "";
+  if (!recentEntries.length) {
+    const empty = document.createElement("p");
+    empty.className = "file-meta";
+    empty.textContent = "还没有最近阅读记录";
+    elements.recentList.append(empty);
+    return;
+  }
+
+  for (const entry of recentEntries) {
+    const book = bookMap.get(entry.bookId);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = `${book?.name || entry.bookId} · 第 ${Number(entry.chapterIndex || 0) + 1} 章`;
+    if (state.book?.id === entry.bookId) {
+      button.classList.add("active");
+    }
+    button.addEventListener("click", async () => {
+      await loadBook(entry.bookId);
+    });
+    elements.recentList.append(button);
+  }
+}
+
+function renderStats() {
+  const stats = [];
+  const chapter = state.book?.chapters?.[state.currentChapterIndex];
+  const chapterCount = state.book?.chapters?.length || 0;
+  const chapterChars = chapter?.content?.length || 0;
+  const totalChars = state.book?.chapters?.reduce((sum, item) => sum + (item.content?.length || 0), 0) || 0;
+  const chapterProgress = chapterCount ? `${state.currentChapterIndex + 1} / ${chapterCount}` : "-";
+  const pageProgress = isScrollMode()
+    ? elements.pageIndicator.textContent || "0%"
+    : `${Math.floor(state.currentPageIndex / Math.max(1, state.pagesPerView)) + 1} / ${Math.max(1, Math.ceil(state.pages.length / Math.max(1, state.pagesPerView)))}`;
+
+  stats.push(["模式", isScrollMode() ? "单页滚动" : state.pagesPerView === 2 ? "书本双页" : "书本单页"]);
+  stats.push(["章节", chapterProgress]);
+  stats.push(["页进度", pageProgress]);
+  stats.push(["本章字数", chapterChars ? `${chapterChars.toLocaleString()} 字` : "-"]);
+  stats.push(["全书字数", totalChars ? `${totalChars.toLocaleString()} 字` : "-"]);
+  stats.push(["书签数", `${state.bookmarks.length}`]);
+
+  elements.statsList.innerHTML = "";
+  for (const [label, value] of stats) {
+    const item = document.createElement("div");
+    item.className = "stats-item";
+    const left = document.createElement("span");
+    left.textContent = label;
+    const right = document.createElement("span");
+    right.textContent = value;
+    item.append(left, right);
+    elements.statsList.append(item);
+  }
+}
+
+function setShortcutsOverlay(open) {
+  shortcutsOpen = open;
+  elements.shortcutsOverlay.classList.toggle("hidden", !open);
+}
+
 function renderLibrary() {
   elements.librarySelect.innerHTML = "";
 
@@ -549,6 +624,7 @@ function renderSpread() {
   }
   animateTurn();
   renderToc();
+  renderStats();
   renderDebugPanel();
 }
 
@@ -563,6 +639,7 @@ async function persistProgress() {
     pageIndex: state.currentPageIndex,
     updatedAt: Date.now()
   });
+  refreshRecentReads();
 }
 
 function getPageContentDimensions() {
@@ -795,6 +872,7 @@ async function loadBook(bookId) {
   rebuildPages();
   await refreshBookmarks();
   renderLibrary();
+  await refreshRecentReads();
 }
 
 async function handleFileSelection(event) {
@@ -845,6 +923,7 @@ async function handleImportBackup(event) {
     detectPagesPerView();
     state.books = await listBooks();
     renderLibrary();
+    await refreshRecentReads();
 
     const preferredBookId = state.book?.id || payload.books[0]?.id || state.books[0]?.id;
     if (preferredBookId) {
@@ -1011,6 +1090,17 @@ function bindEvents() {
   elements.immersiveExit.addEventListener("click", () => {
     toggleImmersiveMode();
   });
+  elements.shortcutsToggle.addEventListener("click", () => {
+    setShortcutsOverlay(true);
+  });
+  elements.shortcutsClose.addEventListener("click", () => {
+    setShortcutsOverlay(false);
+  });
+  elements.shortcutsOverlay.addEventListener("click", (event) => {
+    if (event.target === elements.shortcutsOverlay) {
+      setShortcutsOverlay(false);
+    }
+  });
   elements.debugToggle.addEventListener("click", toggleDebugPanel);
   elements.readingMode.addEventListener("change", handleSettingsChange);
   elements.themeSelect.addEventListener("change", handleSettingsChange);
@@ -1041,6 +1131,18 @@ function bindEvents() {
   document.addEventListener("keydown", (event) => {
     const target = event.target;
     if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    if (event.key === "Escape" && shortcutsOpen) {
+      event.preventDefault();
+      setShortcutsOverlay(false);
+      return;
+    }
+
+    if (event.key === "?" || event.key.toLowerCase() === "h") {
+      event.preventDefault();
+      setShortcutsOverlay(true);
       return;
     }
 
@@ -1120,7 +1222,9 @@ async function bootstrap() {
   applySettings();
   renderLibrary();
   renderBookmarks();
+  renderStats();
   bindEvents();
+  await refreshRecentReads();
 
   if (state.books[0]) {
     await loadBook(state.books[0].id);

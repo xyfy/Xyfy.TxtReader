@@ -237,6 +237,27 @@ body.is-immersive .side-panel {
   gap: 8px;
 }
 
+.stats-list {
+  display: grid;
+  gap: 8px;
+}
+
+.stats-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.24);
+  font-size: 13px;
+}
+
+.stats-item span:last-child {
+  color: var(--muted-color);
+  text-align: right;
+}
+
 .list button.active {
   background: var(--accent-color);
   color: #fffaf0;
@@ -540,6 +561,57 @@ body.is-immersive .immersive-exit.hidden {
 
 .debug-panel.hidden {
   display: none;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(27, 20, 12, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay-card {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  background: var(--surface-color);
+  box-shadow: 0 24px 60px var(--surface-shadow);
+}
+
+.overlay-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.shortcut-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.shortcut-grid div {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.shortcut-grid span {
+  color: var(--muted-color);
 }
 
 #font-size {
