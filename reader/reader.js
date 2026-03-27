@@ -81,6 +81,32 @@ let resizeTimer = null;
 let modeHintTimer = null;
 let warmupTimer = null;
 
+function requestWarmupWork(callback) {
+  if (typeof window.requestIdleCallback === "function") {
+    return window.requestIdleCallback(callback, { timeout: 120 });
+  }
+
+  return window.setTimeout(() => {
+    callback({
+      didTimeout: false,
+      timeRemaining: () => 8
+    });
+  }, 16);
+}
+
+function cancelWarmupWork(handle) {
+  if (!handle) {
+    return;
+  }
+
+  if (typeof window.cancelIdleCallback === "function") {
+    window.cancelIdleCallback(handle);
+    return;
+  }
+
+  clearTimeout(handle);
+}
+
 function isScrollMode() {
   return state.settings.readingMode === "scroll";
 }
@@ -243,7 +269,7 @@ function setCachedPages(cacheKey, pages) {
 
 function cancelPaginationWarmup() {
   if (warmupTimer) {
-    clearTimeout(warmupTimer);
+    cancelWarmupWork(warmupTimer);
     warmupTimer = null;
   }
 }
@@ -253,13 +279,14 @@ function clearActivePaginationSession() {
   state.activePaginationSession = null;
 }
 
-function ensurePagesLoaded(requiredCount) {
+function ensurePagesLoaded(requiredCount, maxPagesToGenerate = Number.POSITIVE_INFINITY) {
   const session = state.activePaginationSession;
   if (!session) {
     return;
   }
 
-  while (!session.done && session.pages.length < requiredCount) {
+  let generated = 0;
+  while (!session.done && session.pages.length < requiredCount && generated < maxPagesToGenerate) {
     const nextPage = session.pager.next();
     if (!nextPage) {
       session.done = true;
@@ -267,6 +294,7 @@ function ensurePagesLoaded(requiredCount) {
     }
     session.pages.push(nextPage);
     session.done = session.pager.done;
+    generated += 1;
   }
 
   state.pages = session.pages;
@@ -284,13 +312,22 @@ function schedulePaginationWarmup() {
     return;
   }
 
-  warmupTimer = setTimeout(() => {
+  warmupTimer = requestWarmupWork((deadline) => {
     const activeSession = state.activePaginationSession;
     if (!activeSession || activeSession.cacheKey !== session.cacheKey) {
       return;
     }
 
-    ensurePagesLoaded(activeSession.pages.length + 6);
+    let budgetPages = 0;
+    while (budgetPages < 4 && (deadline.didTimeout || deadline.timeRemaining() > 3)) {
+      const before = activeSession.pages.length;
+      ensurePagesLoaded(activeSession.pages.length + 1, 1);
+      if (activeSession.pages.length === before) {
+        break;
+      }
+      budgetPages += 1;
+    }
+
     if (activeSession.done) {
       if (state.book?.id === activeSession.bookId && state.currentChapterIndex === activeSession.chapterIndex) {
         renderSpread();
@@ -299,7 +336,7 @@ function schedulePaginationWarmup() {
     }
 
     schedulePaginationWarmup();
-  }, 0);
+  });
 }
 
 function setBackupStatus(message, isError = false) {
