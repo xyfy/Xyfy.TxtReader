@@ -24,6 +24,7 @@ const state = {
   book: null,
   bookmarks: [],
   pages: [],
+  chapterPageCache: new Map(),
   debugEnabled: false,
   immersiveActive: false,
   panelHiddenBeforeImmersive: false,
@@ -32,6 +33,8 @@ const state = {
   currentChapterIndex: 0,
   currentPageIndex: 0
 };
+
+const PAGE_CACHE_LIMIT = 8;
 
 const elements = {
   fileInput: document.getElementById("file-input"),
@@ -199,6 +202,41 @@ function formatSize(size) {
   }
 
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function buildPaginationCacheKey(bookId, chapterIndex, pageDimensions) {
+  const width = pageDimensions ? Math.round(pageDimensions.width) : 0;
+  const height = pageDimensions ? Math.round(pageDimensions.height) : 0;
+  return [
+    bookId,
+    chapterIndex,
+    state.settings.readingMode,
+    state.settings.fontFamily,
+    state.settings.fontSize,
+    state.settings.lineHeight,
+    width,
+    height,
+    state.pagesPerView
+  ].join("::");
+}
+
+function getCachedPages(cacheKey) {
+  const cached = state.chapterPageCache.get(cacheKey);
+  if (!cached) {
+    return null;
+  }
+
+  state.chapterPageCache.delete(cacheKey);
+  state.chapterPageCache.set(cacheKey, cached);
+  return cached;
+}
+
+function setCachedPages(cacheKey, pages) {
+  state.chapterPageCache.set(cacheKey, pages);
+  while (state.chapterPageCache.size > PAGE_CACHE_LIMIT) {
+    const oldestKey = state.chapterPageCache.keys().next().value;
+    state.chapterPageCache.delete(oldestKey);
+  }
 }
 
 function setBackupStatus(message, isError = false) {
@@ -566,9 +604,28 @@ function rebuildPages() {
 
   const pageDimensions = getPageContentDimensions();
   state.lastPageDimensions = pageDimensions;
+  const cacheKey = state.book ? buildPaginationCacheKey(state.book.id, state.currentChapterIndex, pageDimensions) : null;
   if (isScrollMode()) {
-    state.pages = [chapter.content.replace(/\r\n/g, "\n").trim()];
+    const scrollPages = cacheKey ? getCachedPages(cacheKey) : null;
+    state.pages = scrollPages || [chapter.content.replace(/\r\n/g, "\n").trim()];
+    if (cacheKey && !scrollPages) {
+      setCachedPages(cacheKey, state.pages);
+    }
     state.currentPageIndex = 0;
+    renderSpread();
+    persistProgress();
+    return;
+  }
+
+  const cachedPages = cacheKey ? getCachedPages(cacheKey) : null;
+  if (cachedPages) {
+    state.pages = cachedPages;
+    if (state.currentPageIndex >= state.pages.length) {
+      state.currentPageIndex = 0;
+    }
+    if (state.currentPageIndex % state.pagesPerView !== 0) {
+      state.currentPageIndex -= state.currentPageIndex % state.pagesPerView;
+    }
     renderSpread();
     persistProgress();
     return;
@@ -580,6 +637,9 @@ function rebuildPages() {
     state.pages = paginateChapter(chapter.content, state.settings, pageDimensions, (text) => fitChecker.fits(text));
   } finally {
     fitChecker?.dispose();
+  }
+  if (cacheKey) {
+    setCachedPages(cacheKey, state.pages);
   }
   if (state.currentPageIndex >= state.pages.length) {
     state.currentPageIndex = 0;
@@ -638,6 +698,7 @@ async function handleFileSelection(event) {
     chapters
   });
 
+  state.chapterPageCache.clear();
   state.books = await listBooks();
   await loadBook(saved.id);
 }
@@ -666,6 +727,7 @@ async function handleImportBackup(event) {
     const payload = parseBackupPayload(text);
     const result = await importBackupSnapshot(payload);
 
+    state.chapterPageCache.clear();
     state.settings = await getReaderSettings();
     applySettings();
     detectPagesPerView();
