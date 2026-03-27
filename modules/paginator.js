@@ -47,9 +47,25 @@ function splitParagraph(paragraph, maxChars) {
   return chunks;
 }
 
-export function paginateChapter(content, settings) {
+/**
+ * @param {string} content
+ * @param {object} settings - { fontSize, lineHeight }
+ * @param {{ width: number, height: number } | null} [pageDimensions]
+ */
+export function paginateChapter(content, settings, pageDimensions = null) {
   const normalized = content.replace(/\r\n/g, "\n").trim();
-  const targetChars = Math.max(700, Math.round(2200 - settings.fontSize * 45));
+
+  let targetChars;
+  if (pageDimensions && pageDimensions.width > 50 && pageDimensions.height > 50) {
+    const lineHeightPx = settings.fontSize * (settings.lineHeight || 1.8);
+    // CJK full-width chars ≈ fontSize px wide; use 0.9 safety factor
+    const charsPerLine = Math.floor((pageDimensions.width / settings.fontSize) * 0.9);
+    const linesPerPage = Math.floor(pageDimensions.height / lineHeightPx);
+    targetChars = Math.max(200, charsPerLine * linesPerPage);
+  } else {
+    targetChars = Math.max(700, Math.round(2200 - settings.fontSize * 45));
+  }
+
   const paragraphs = normalized
     .split(/\n{2,}/)
     .flatMap((paragraph) => splitParagraph(paragraph.trim(), targetChars));

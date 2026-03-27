@@ -213,6 +213,19 @@ async function persistProgress() {
   });
 }
 
+function getPageContentDimensions() {
+  const el = elements.leftPage;
+  if (!el || el.clientHeight === 0) return null;
+  // padding: 28px top/bottom, 32px sides (64px total horizontal)
+  // page-title: ~12px font + 1.5 line-height + 18px margin-bottom ≈ 38px
+  const horizPad = 64;
+  const vertPad = 28 + 28 + 38;
+  return {
+    width: Math.max(50, el.clientWidth - horizPad),
+    height: Math.max(50, el.clientHeight - vertPad)
+  };
+}
+
 function rebuildPages() {
   const chapter = state.book?.chapters?.[state.currentChapterIndex];
   if (!chapter) {
@@ -221,7 +234,7 @@ function rebuildPages() {
     return;
   }
 
-  state.pages = paginateChapter(chapter.content, state.settings);
+  state.pages = paginateChapter(chapter.content, state.settings, getPageContentDimensions());
   if (state.currentPageIndex >= state.pages.length) {
     state.currentPageIndex = 0;
   }
