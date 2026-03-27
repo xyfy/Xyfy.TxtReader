@@ -22,6 +22,8 @@ const state = {
   bookmarks: [],
   pages: [],
   debugEnabled: false,
+  immersiveActive: false,
+  panelHiddenBeforeImmersive: false,
   lastPageDimensions: null,
   pagesPerView: 2,
   currentChapterIndex: 0,
@@ -56,6 +58,7 @@ const elements = {
   spreadShell: document.querySelector(".spread-shell"),
   appShell: document.querySelector(".app-shell"),
   togglePanel: document.getElementById("toggle-panel"),
+  immersiveToggle: document.getElementById("immersive-toggle"),
   debugToggle: document.getElementById("debug-toggle"),
   debugPanel: document.getElementById("debug-panel"),
   readerHeader: document.querySelector(".reader-header"),
@@ -79,6 +82,67 @@ function updateNavButtonLabels() {
 
   elements.prevPage.textContent = "上一页";
   elements.nextPage.textContent = "下一页";
+}
+
+function updateImmersiveButton() {
+  elements.immersiveToggle.textContent = state.immersiveActive ? "🗗" : "⛶";
+  elements.immersiveToggle.classList.toggle("active", state.immersiveActive);
+  elements.immersiveToggle.setAttribute("aria-pressed", String(state.immersiveActive));
+  elements.immersiveToggle.title = state.immersiveActive ? "退出沉浸模式" : "进入沉浸模式";
+}
+
+function applyImmersiveVisualState(active) {
+  state.immersiveActive = active;
+  document.body.classList.toggle("is-immersive", active);
+  updateImmersiveButton();
+}
+
+function syncImmersiveStateFromFullscreen() {
+  const active = Boolean(document.fullscreenElement);
+  applyImmersiveVisualState(active);
+
+  if (!active && !state.panelHiddenBeforeImmersive) {
+    elements.appShell.classList.remove("panel-hidden");
+  }
+
+  if (active && !elements.appShell.classList.contains("panel-hidden")) {
+    elements.appShell.classList.add("panel-hidden");
+  }
+
+  detectPagesPerView();
+  rebuildPages();
+}
+
+async function toggleImmersiveMode() {
+  const supportsFullscreen = typeof document.documentElement.requestFullscreen === "function";
+  const nextActive = !state.immersiveActive;
+
+  if (nextActive) {
+    state.panelHiddenBeforeImmersive = elements.appShell.classList.contains("panel-hidden");
+  }
+
+  if (supportsFullscreen) {
+    try {
+      if (nextActive) {
+        await document.documentElement.requestFullscreen();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+      return;
+    } catch {
+      // Fall back to in-page immersive mode when fullscreen fails.
+    }
+  }
+
+  applyImmersiveVisualState(nextActive);
+  if (nextActive) {
+    elements.appShell.classList.add("panel-hidden");
+  } else if (!state.panelHiddenBeforeImmersive) {
+    elements.appShell.classList.remove("panel-hidden");
+  }
+
+  detectPagesPerView();
+  rebuildPages();
 }
 
 function hideModeHint() {
@@ -251,6 +315,7 @@ function applySettings() {
   elements.animationStyle.disabled = disableAnimation;
   elements.animationIntensity.disabled = disableAnimation;
   updateNavButtonLabels();
+  updateImmersiveButton();
   if (!isScrollMode()) {
     hideModeHint();
   }
@@ -727,6 +792,9 @@ function bindEvents() {
   });
   elements.bookmarkButton.addEventListener("click", addBookmark);
   elements.togglePanel.addEventListener("click", toggleSidePanel);
+  elements.immersiveToggle.addEventListener("click", () => {
+    toggleImmersiveMode();
+  });
   elements.debugToggle.addEventListener("click", toggleDebugPanel);
   elements.readingMode.addEventListener("change", handleSettingsChange);
   elements.themeSelect.addEventListener("change", handleSettingsChange);
@@ -826,6 +894,8 @@ function bindEvents() {
       addBookmark();
     }
   });
+
+  document.addEventListener("fullscreenchange", syncImmersiveStateFromFullscreen);
 }
 
 async function bootstrap() {
