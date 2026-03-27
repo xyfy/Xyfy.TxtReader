@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <filter id="bshadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="128" height="128" rx="22" fill="url(#bg)"/>
+
+  <!-- Open book with drop shadow -->
+  <g filter="url(#bshadow)">
+    <!-- Left page -->
+    <path d="M14 44 C14 39 18 37 22 37.5 L61 40.5 L61 91 L20 87.5 C16 87 14 84.5 14 80.5 Z"
+          fill="#f8f4ed"/>
+    <!-- Right page -->
+    <path d="M67 40.5 L106 37.5 C110 37 114 39 114 44 L114 80.5 C114 84.5 112 87 108 87.5 L67 91 Z"
+          fill="#f0ebe0"/>
+    <!-- Spine -->
+    <rect x="61" y="40" width="6" height="51" rx="1" fill="#c4ad90"/>
+  </g>
+
+  <!-- Page curl highlight on left page -->
+  <path d="M22 37.5 L61 40.5" stroke="#ffffff" stroke-width="1.2" stroke-opacity="0.45" fill="none"/>
+  <path d="M22 37.5 L61 40.5" stroke="#c4ad90" stroke-width="0.6" fill="none" stroke-opacity="0.3"/>
+
+  <!-- Text lines — left page -->
+  <rect x="22" y="51" width="32" height="3"   rx="1.5" fill="#9c8a72" opacity="0.8"/>
+  <rect x="22" y="59" width="35" height="3"   rx="1.5" fill="#9c8a72" opacity="0.8"/>
+  <rect x="22" y="67" width="29" height="3"   rx="1.5" fill="#9c8a72" opacity="0.8"/>
+  <rect x="22" y="75" width="22" height="2.5" rx="1.25" fill="#9c8a72" opacity="0.6"/>
+
+  <!-- Text lines — right page -->
+  <rect x="76" y="51" width="30" height="3"   rx="1.5" fill="#9c8a72" opacity="0.8"/>
+  <rect x="76" y="59" width="25" height="3"   rx="1.5" fill="#9c8a72" opacity="0.8"/>
+  <rect x="76" y="67" width="33" height="3"   rx="1.5" fill="#9c8a72" opacity="0.8"/>
+  <rect x="76" y="75" width="20" height="2.5" rx="1.25" fill="#9c8a72" opacity="0.6"/>
+</svg>
