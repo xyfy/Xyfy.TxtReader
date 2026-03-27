@@ -49,7 +49,9 @@ const elements = {
   fontSize: document.getElementById("font-size"),
   animationStyle: document.getElementById("animation-style"),
   animationIntensity: document.getElementById("animation-intensity"),
-  spreadShell: document.querySelector(".spread-shell")
+  spreadShell: document.querySelector(".spread-shell"),
+  appShell: document.querySelector(".app-shell"),
+  togglePanel: document.getElementById("toggle-panel")
 };
 
 function detectPagesPerView() {
@@ -373,6 +375,13 @@ async function handleSettingsChange() {
   rebuildPages();
 }
 
+function toggleSidePanel() {
+  const hidden = elements.appShell.classList.toggle("panel-hidden");
+  elements.togglePanel.setAttribute("aria-pressed", String(hidden));
+  // Re-paginate after transition completes so new page width is measured correctly
+  setTimeout(() => rebuildPages(), 250);
+}
+
 function bindEvents() {
   elements.fileInput.addEventListener("change", handleFileSelection);
   elements.librarySelect.addEventListener("change", (event) => {
@@ -393,6 +402,7 @@ function bindEvents() {
     }
   });
   elements.bookmarkButton.addEventListener("click", addBookmark);
+  elements.togglePanel.addEventListener("click", toggleSidePanel);
   elements.themeSelect.addEventListener("change", handleSettingsChange);
   elements.fontSelect.addEventListener("change", handleSettingsChange);
   elements.fontSize.addEventListener("input", handleSettingsChange);
@@ -415,6 +425,11 @@ function bindEvents() {
     const target = event.target;
     if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
       return;
+    }
+
+    if (event.key === "Tab") {
+      event.preventDefault();
+      toggleSidePanel();
     }
 
     if (event.key === "ArrowRight" || event.key.toLowerCase() === "j") {

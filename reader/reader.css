@@ -78,6 +78,11 @@ input:focus-visible {
   grid-template-columns: 320px 1fr;
   height: 100vh;
   overflow: hidden;
+  transition: grid-template-columns 240ms ease;
+}
+
+.app-shell.panel-hidden {
+  grid-template-columns: 0 1fr;
 }
 
 .side-panel {
@@ -88,6 +93,13 @@ input:focus-visible {
   height: 100%;
   box-sizing: border-box;
   overflow-y: auto;
+  overflow-x: hidden;
+  transition: opacity 200ms ease;
+}
+
+.app-shell.panel-hidden .side-panel {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .panel-block + .panel-block {
