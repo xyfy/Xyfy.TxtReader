@@ -59,6 +59,7 @@ const elements = {
   appShell: document.querySelector(".app-shell"),
   togglePanel: document.getElementById("toggle-panel"),
   immersiveToggle: document.getElementById("immersive-toggle"),
+  immersiveExit: document.getElementById("immersive-exit"),
   debugToggle: document.getElementById("debug-toggle"),
   debugPanel: document.getElementById("debug-panel"),
   readerHeader: document.querySelector(".reader-header"),
@@ -89,6 +90,7 @@ function updateImmersiveButton() {
   elements.immersiveToggle.classList.toggle("active", state.immersiveActive);
   elements.immersiveToggle.setAttribute("aria-pressed", String(state.immersiveActive));
   elements.immersiveToggle.title = state.immersiveActive ? "退出沉浸模式" : "进入沉浸模式";
+  elements.immersiveExit.classList.toggle("hidden", !state.immersiveActive);
 }
 
 function applyImmersiveVisualState(active) {
@@ -97,41 +99,11 @@ function applyImmersiveVisualState(active) {
   updateImmersiveButton();
 }
 
-function syncImmersiveStateFromFullscreen() {
-  const active = Boolean(document.fullscreenElement);
-  applyImmersiveVisualState(active);
-
-  if (!active && !state.panelHiddenBeforeImmersive) {
-    elements.appShell.classList.remove("panel-hidden");
-  }
-
-  if (active && !elements.appShell.classList.contains("panel-hidden")) {
-    elements.appShell.classList.add("panel-hidden");
-  }
-
-  detectPagesPerView();
-  rebuildPages();
-}
-
 async function toggleImmersiveMode() {
-  const supportsFullscreen = typeof document.documentElement.requestFullscreen === "function";
   const nextActive = !state.immersiveActive;
 
   if (nextActive) {
     state.panelHiddenBeforeImmersive = elements.appShell.classList.contains("panel-hidden");
-  }
-
-  if (supportsFullscreen) {
-    try {
-      if (nextActive) {
-        await document.documentElement.requestFullscreen();
-      } else if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      }
-      return;
-    } catch {
-      // Fall back to in-page immersive mode when fullscreen fails.
-    }
   }
 
   applyImmersiveVisualState(nextActive);
@@ -795,6 +767,9 @@ function bindEvents() {
   elements.immersiveToggle.addEventListener("click", () => {
     toggleImmersiveMode();
   });
+  elements.immersiveExit.addEventListener("click", () => {
+    toggleImmersiveMode();
+  });
   elements.debugToggle.addEventListener("click", toggleDebugPanel);
   elements.readingMode.addEventListener("change", handleSettingsChange);
   elements.themeSelect.addEventListener("change", handleSettingsChange);
@@ -895,7 +870,6 @@ function bindEvents() {
     }
   });
 
-  document.addEventListener("fullscreenchange", syncImmersiveStateFromFullscreen);
 }
 
 async function bootstrap() {

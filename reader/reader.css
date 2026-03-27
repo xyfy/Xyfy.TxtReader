@@ -87,6 +87,7 @@ input:focus-visible {
 
 body.is-immersive .app-shell {
   grid-template-columns: 0 1fr;
+  background: transparent;
 }
 
 .side-panel {
@@ -196,8 +197,9 @@ select {
 }
 
 body.is-immersive .reader-shell {
-  gap: 10px;
-  padding: 12px;
+  grid-template-rows: 1fr;
+  gap: 0;
+  padding: 0;
 }
 
 .reader-header,
@@ -219,6 +221,26 @@ body.is-immersive .reader-header h1 {
 
 body.is-immersive .eyebrow {
   display: none;
+}
+
+body.is-immersive .reader-header,
+body.is-immersive .reader-footer,
+body.is-immersive .debug-panel {
+  display: none;
+}
+
+body.is-immersive .spread-shell {
+  height: 100vh;
+  min-height: 100vh;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  box-shadow: none;
+}
+
+body.is-immersive .paper-page {
+  padding-top: 24px;
+  padding-bottom: 24px;
 }
 
 .header-actions,
@@ -413,6 +435,30 @@ body.is-immersive .eyebrow {
 #immersive-toggle.active {
   background: var(--accent-color);
   color: #fffaf0;
+}
+
+.immersive-exit {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 30;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+}
+
+.immersive-exit.hidden {
+  display: none;
+}
+
+body.is-immersive .immersive-exit.hidden {
+  display: inline-flex;
 }
 
 .debug-panel {
