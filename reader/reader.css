@@ -368,6 +368,21 @@ select {
   gap: 8px;
 }
 
+.mode-hint {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--muted-color);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.mode-hint.hidden {
+  display: none;
+}
+
 #debug-toggle.active {
   background: var(--accent-color);
   color: #fffaf0;

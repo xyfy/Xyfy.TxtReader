@@ -42,6 +42,7 @@ const elements = {
   leftPage: document.getElementById("left-page"),
   rightPage: document.getElementById("right-page"),
   pageIndicator: document.getElementById("page-indicator"),
+  modeHint: document.getElementById("mode-hint"),
   prevPage: document.getElementById("prev-page"),
   nextPage: document.getElementById("next-page"),
   prevChapter: document.getElementById("prev-chapter"),
@@ -63,6 +64,7 @@ const elements = {
 };
 
 let resizeTimer = null;
+let modeHintTimer = null;
 
 function isScrollMode() {
   return state.settings.readingMode === "scroll";
@@ -77,6 +79,32 @@ function updateNavButtonLabels() {
 
   elements.prevPage.textContent = "上一页";
   elements.nextPage.textContent = "下一页";
+}
+
+function hideModeHint() {
+  elements.modeHint.classList.add("hidden");
+  elements.modeHint.textContent = "";
+}
+
+function showModeHint(text, duration = 1800) {
+  if (!isScrollMode()) {
+    hideModeHint();
+    return;
+  }
+
+  elements.modeHint.textContent = text;
+  elements.modeHint.classList.remove("hidden");
+
+  if (modeHintTimer) {
+    clearTimeout(modeHintTimer);
+  }
+
+  if (duration > 0) {
+    modeHintTimer = setTimeout(() => {
+      hideModeHint();
+      modeHintTimer = null;
+    }, duration);
+  }
 }
 
 function detectPagesPerView() {
@@ -223,6 +251,9 @@ function applySettings() {
   elements.animationStyle.disabled = disableAnimation;
   elements.animationIntensity.disabled = disableAnimation;
   updateNavButtonLabels();
+  if (!isScrollMode()) {
+    hideModeHint();
+  }
 }
 
 function updateScrollIndicator() {
@@ -233,6 +264,23 @@ function updateScrollIndicator() {
   const maxScroll = Math.max(1, elements.leftPage.scrollHeight - elements.leftPage.clientHeight);
   const progress = Math.round((elements.leftPage.scrollTop / maxScroll) * 100);
   elements.pageIndicator.textContent = `${progress}%`;
+
+  if (maxScroll <= 1) {
+    hideModeHint();
+    return;
+  }
+
+  if (isAtScrollBoundary(1)) {
+    showModeHint("已到底，按空格切下一章", 1200);
+    return;
+  }
+
+  if (isAtScrollBoundary(-1)) {
+    showModeHint("已到顶，Shift+空格回上一章", 1200);
+    return;
+  }
+
+  hideModeHint();
 }
 
 function scrollContentBy(delta, behavior = "auto") {
@@ -264,6 +312,7 @@ function isAtScrollBoundary(direction) {
 function handleScrollModeSpace(direction) {
   if (direction > 0 && isAtScrollBoundary(1)) {
     if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
+      showModeHint("切换到下一章", 700);
       goToChapter(state.currentChapterIndex + 1);
     }
     return;
@@ -271,6 +320,7 @@ function handleScrollModeSpace(direction) {
 
   if (direction < 0 && isAtScrollBoundary(-1)) {
     if (state.currentChapterIndex > 0) {
+      showModeHint("切换到上一章", 700);
       goToChapter(state.currentChapterIndex - 1);
     }
     return;
