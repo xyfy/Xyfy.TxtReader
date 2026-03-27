@@ -227,6 +227,18 @@ select {
   display: none;
 }
 
+.spread-shell.is-scroll-mode {
+  grid-template-columns: 1fr;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.spread-shell.is-scroll-mode .right-page {
+  display: none;
+}
+
 .paper-page {
   position: relative;
   display: flex;
@@ -247,6 +259,18 @@ select {
 
 .right-page {
   box-shadow: inset 8px 0 18px rgba(0, 0, 0, 0.05);
+}
+
+.spread-shell.is-scroll-mode .paper-page {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.spread-shell.is-scroll-mode .left-page {
+  border-right: 1px solid var(--border-color);
+  box-shadow: none;
 }
 
 .page-title {
@@ -272,6 +296,11 @@ select {
 
 .page-content.empty {
   color: var(--muted-color);
+}
+
+.spread-shell.is-scroll-mode .page-content {
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .page-content.turn-slide-soft {

@@ -46,6 +46,7 @@ const elements = {
   nextPage: document.getElementById("next-page"),
   prevChapter: document.getElementById("prev-chapter"),
   nextChapter: document.getElementById("next-chapter"),
+  readingMode: document.getElementById("reading-mode"),
   themeSelect: document.getElementById("theme-select"),
   fontSelect: document.getElementById("font-select"),
   fontSize: document.getElementById("font-size"),
@@ -63,7 +64,18 @@ const elements = {
 
 let resizeTimer = null;
 
+function isScrollMode() {
+  return state.settings.readingMode === "scroll";
+}
+
 function detectPagesPerView() {
+  if (isScrollMode()) {
+    state.pagesPerView = 1;
+    elements.spreadShell.classList.add("is-single", "is-scroll-mode");
+    return;
+  }
+
+  elements.spreadShell.classList.remove("is-scroll-mode");
   const forceSingleByViewport = window.matchMedia("(max-width: 820px)").matches;
   const spreadWidth = elements.spreadShell?.clientWidth || 0;
   const minPageWidth = 420;
@@ -190,11 +202,44 @@ function applySettings() {
   document.documentElement.style.setProperty("--font-family", state.settings.fontFamily);
   document.documentElement.style.setProperty("--font-size", `${state.settings.fontSize}px`);
   document.documentElement.style.setProperty("--line-height", String(state.settings.lineHeight));
+  elements.readingMode.value = state.settings.readingMode || "book";
   elements.themeSelect.value = state.settings.theme;
   elements.fontSelect.value = state.settings.fontFamily;
   elements.fontSize.value = String(state.settings.fontSize);
   elements.animationStyle.value = state.settings.animationStyle || "slide";
   elements.animationIntensity.value = String(state.settings.animationIntensity || 2);
+  const disableAnimation = isScrollMode();
+  elements.animationStyle.disabled = disableAnimation;
+  elements.animationIntensity.disabled = disableAnimation;
+}
+
+function updateScrollIndicator() {
+  if (!isScrollMode()) {
+    return;
+  }
+
+  const maxScroll = Math.max(1, elements.leftPage.scrollHeight - elements.leftPage.clientHeight);
+  const progress = Math.round((elements.leftPage.scrollTop / maxScroll) * 100);
+  elements.pageIndicator.textContent = `${progress}%`;
+}
+
+function scrollContentBy(delta, behavior = "auto") {
+  if (!isScrollMode()) {
+    return;
+  }
+
+  elements.leftPage.scrollBy({ top: delta, behavior });
+  window.setTimeout(updateScrollIndicator, behavior === "smooth" ? 180 : 20);
+}
+
+function scrollByScreen(direction) {
+  const delta = Math.max(120, Math.floor(elements.leftPage.clientHeight * 0.9)) * direction;
+  scrollContentBy(delta, "smooth");
+}
+
+function scrollByLine(direction) {
+  const delta = Math.max(24, Math.round(state.settings.fontSize * (state.settings.lineHeight || 1.8))) * direction;
+  scrollContentBy(delta, "auto");
 }
 
 function renderSpread() {
@@ -211,7 +256,13 @@ function renderSpread() {
   elements.rightPage.textContent = right || "已经到本章末尾";
   elements.leftPage.classList.toggle("empty", !left);
   elements.rightPage.classList.toggle("empty", !right && state.pagesPerView === 2);
-  elements.pageIndicator.textContent = `${spreadIndex} / ${spreadTotal}`;
+  if (isScrollMode()) {
+    elements.pageIndicator.textContent = "0%";
+    elements.leftPage.scrollTop = 0;
+    updateScrollIndicator();
+  } else {
+    elements.pageIndicator.textContent = `${spreadIndex} / ${spreadTotal}`;
+  }
   animateTurn();
   renderToc();
   renderDebugPanel();
@@ -375,6 +426,14 @@ function rebuildPages() {
 
   const pageDimensions = getPageContentDimensions();
   state.lastPageDimensions = pageDimensions;
+  if (isScrollMode()) {
+    state.pages = [chapter.content.replace(/\r\n/g, "\n").trim()];
+    state.currentPageIndex = 0;
+    renderSpread();
+    persistProgress();
+    return;
+  }
+
   let fitChecker = null;
   try {
     fitChecker = createPageFitChecker(elements.leftPage);
@@ -454,6 +513,11 @@ function nextPage() {
     return;
   }
 
+  if (isScrollMode()) {
+    scrollByScreen(1);
+    return;
+  }
+
   if (state.currentPageIndex + state.pagesPerView < state.pages.length) {
     state.currentPageIndex += state.pagesPerView;
     renderSpread();
@@ -468,6 +532,11 @@ function nextPage() {
 
 function prevPage() {
   if (!state.book) {
+    return;
+  }
+
+  if (isScrollMode()) {
+    scrollByScreen(-1);
     return;
   }
 
@@ -508,6 +577,7 @@ async function addBookmark() {
 async function handleSettingsChange() {
   state.settings = {
     ...state.settings,
+    readingMode: elements.readingMode.value,
     theme: elements.themeSelect.value,
     fontFamily: elements.fontSelect.value,
     fontSize: Number(elements.fontSize.value),
@@ -516,6 +586,7 @@ async function handleSettingsChange() {
     animationIntensity: Number(elements.animationIntensity.value)
   };
   applySettings();
+  detectPagesPerView();
   await saveReaderSettings(state.settings);
   rebuildPages();
 }
@@ -565,11 +636,17 @@ function bindEvents() {
   elements.bookmarkButton.addEventListener("click", addBookmark);
   elements.togglePanel.addEventListener("click", toggleSidePanel);
   elements.debugToggle.addEventListener("click", toggleDebugPanel);
+  elements.readingMode.addEventListener("change", handleSettingsChange);
   elements.themeSelect.addEventListener("change", handleSettingsChange);
   elements.fontSelect.addEventListener("change", handleSettingsChange);
   elements.fontSize.addEventListener("input", handleSettingsChange);
   elements.animationStyle.addEventListener("change", handleSettingsChange);
   elements.animationIntensity.addEventListener("input", handleSettingsChange);
+  elements.leftPage.addEventListener("scroll", () => {
+    if (isScrollMode()) {
+      updateScrollIndicator();
+    }
+  });
 
   window.addEventListener("resize", () => {
     if (resizeTimer) {
@@ -601,25 +678,39 @@ function bindEvents() {
       toggleDebugPanel();
     }
 
-    if (event.key === "ArrowRight" || event.key.toLowerCase() === "j") {
+    if (!isScrollMode() && (event.key === "ArrowRight" || event.key.toLowerCase() === "j")) {
       event.preventDefault();
       nextPage();
     }
 
-    if (event.key === "ArrowLeft" || event.key.toLowerCase() === "k") {
+    if (!isScrollMode() && (event.key === "ArrowLeft" || event.key.toLowerCase() === "k")) {
       event.preventDefault();
       prevPage();
     }
 
+    if (isScrollMode() && event.key === "ArrowDown") {
+      event.preventDefault();
+      scrollByLine(1);
+    }
+
+    if (isScrollMode() && event.key === "ArrowUp") {
+      event.preventDefault();
+      scrollByLine(-1);
+    }
+
     if (event.key === " ") {
       event.preventDefault();
-      if (event.shiftKey) {
-        if (state.currentChapterIndex > 0) {
-          goToChapter(state.currentChapterIndex - 1);
-        }
+      if (isScrollMode()) {
+        scrollByScreen(event.shiftKey ? -1 : 1);
       } else {
-        if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
-          goToChapter(state.currentChapterIndex + 1);
+        if (event.shiftKey) {
+          if (state.currentChapterIndex > 0) {
+            goToChapter(state.currentChapterIndex - 1);
+          }
+        } else {
+          if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
+            goToChapter(state.currentChapterIndex + 1);
+          }
         }
       }
     }

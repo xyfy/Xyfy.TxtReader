@@ -4,6 +4,7 @@ const DEFAULT_SETTINGS = {
   fontFamily: '"Noto Serif SC", Georgia, serif',
   fontSize: 18,
   lineHeight: 1.8,
+  readingMode: "book",
   animationStyle: "slide",
   animationIntensity: 2
 };
