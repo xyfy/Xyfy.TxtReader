@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Xyfy TXT Reader",
-  "version": "0.1.0",
-  "description": "Read local TXT novels with a book-like experience in Chrome and Edge.",
+  "version": "0.2.0",
+  "description": "Local TXT novel reader for Chrome and Edge with book mode, scroll mode, immersive reading, backup, and sync.",
   "permissions": ["storage"],
   "action": {
     "default_title": "Xyfy TXT Reader",
