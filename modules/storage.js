@@ -1,6 +1,7 @@
 const SETTINGS_KEY = "reader-settings";
 const SETTINGS_SYNC_KEY = "reader-settings-sync";
 const PROGRESS_SYNC_KEY = "reader-progress-sync";
+const SETTINGS_UPDATED_AT_KEY = "settingsUpdatedAt";
 const DEFAULT_SETTINGS = {
   theme: "paper",
   fontFamily: '"Noto Serif SC", Georgia, serif',
@@ -80,6 +81,29 @@ function syncArea() {
   return chrome.storage.sync;
 }
 
+export function normalizeStoredSettings(settings = {}, updatedAt = 0) {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...settings,
+    [SETTINGS_UPDATED_AT_KEY]: Number(settings?.[SETTINGS_UPDATED_AT_KEY] || updatedAt || 0)
+  };
+}
+
+export function chooseNewerRecord(localRecord, syncRecord) {
+  const localUpdatedAt = Number(localRecord?.updatedAt || localRecord?.[SETTINGS_UPDATED_AT_KEY] || 0);
+  const syncUpdatedAt = Number(syncRecord?.updatedAt || syncRecord?.[SETTINGS_UPDATED_AT_KEY] || 0);
+
+  if (!localRecord) {
+    return syncRecord || null;
+  }
+
+  if (!syncRecord) {
+    return localRecord;
+  }
+
+  return syncUpdatedAt > localUpdatedAt ? syncRecord : localRecord;
+}
+
 async function mirrorSettingsToSync(settings) {
   const area = syncArea();
   if (!area) {
@@ -113,7 +137,7 @@ async function mirrorProgressToSync(progress) {
 }
 
 export function getDefaultSettings() {
-  return { ...DEFAULT_SETTINGS };
+  return normalizeStoredSettings(DEFAULT_SETTINGS);
 }
 
 export async function getReaderSettings() {
@@ -122,11 +146,23 @@ export async function getReaderSettings() {
     return getDefaultSettings();
   }
 
-  const result = await area.get(SETTINGS_KEY);
-  return {
-    ...DEFAULT_SETTINGS,
-    ...(result[SETTINGS_KEY] || {})
-  };
+  const [localResult, syncResult] = await Promise.all([
+    area.get(SETTINGS_KEY),
+    syncArea() ? syncArea().get(SETTINGS_SYNC_KEY) : Promise.resolve({})
+  ]);
+
+  const localSettings = localResult[SETTINGS_KEY] ? normalizeStoredSettings(localResult[SETTINGS_KEY]) : null;
+  const syncedSettings = syncResult[SETTINGS_SYNC_KEY] ? normalizeStoredSettings(syncResult[SETTINGS_SYNC_KEY]) : null;
+  const winner = chooseNewerRecord(localSettings, syncedSettings) || getDefaultSettings();
+
+  if (!localSettings || winner[SETTINGS_UPDATED_AT_KEY] > localSettings[SETTINGS_UPDATED_AT_KEY]) {
+    await area.set({ [SETTINGS_KEY]: winner });
+  }
+  if (!syncedSettings || winner[SETTINGS_UPDATED_AT_KEY] > syncedSettings[SETTINGS_UPDATED_AT_KEY]) {
+    await mirrorSettingsToSync(winner);
+  }
+
+  return winner;
 }
 
 export async function saveReaderSettings(settings) {
@@ -135,10 +171,12 @@ export async function saveReaderSettings(settings) {
     return;
   }
 
+  const nextSettings = normalizeStoredSettings(settings, Date.now());
+
   await area.set({
-    [SETTINGS_KEY]: settings
+    [SETTINGS_KEY]: nextSettings
   });
-  await mirrorSettingsToSync(settings);
+  await mirrorSettingsToSync(nextSettings);
 }
 
 export async function saveBook(book) {
@@ -185,9 +223,37 @@ export async function saveProgress(progress) {
 }
 
 export async function getProgress(bookId) {
-  return withStore("progress", "readonly", async (store) => {
-    return requestToPromise(store.get(bookId));
-  });
+  const [localProgress, syncResult] = await Promise.all([
+    withStore("progress", "readonly", async (store) => {
+      return requestToPromise(store.get(bookId));
+    }),
+    syncArea() ? syncArea().get(PROGRESS_SYNC_KEY) : Promise.resolve({})
+  ]);
+
+  const syncProgress = syncResult[PROGRESS_SYNC_KEY]?.[bookId] || null;
+  const winner = chooseNewerRecord(localProgress, syncProgress);
+
+  if (winner && (!localProgress || winner.updatedAt > Number(localProgress.updatedAt || 0))) {
+    await withStore("progress", "readwrite", async (store) => {
+      store.put({
+        bookId,
+        chapterIndex: winner.chapterIndex || 0,
+        pageIndex: winner.pageIndex || 0,
+        updatedAt: winner.updatedAt || Date.now()
+      });
+    });
+  }
+
+  if (winner && (!syncProgress || winner.updatedAt > Number(syncProgress.updatedAt || 0))) {
+    await mirrorProgressToSync({
+      bookId,
+      chapterIndex: winner.chapterIndex || 0,
+      pageIndex: winner.pageIndex || 0,
+      updatedAt: winner.updatedAt || Date.now()
+    });
+  }
+
+  return winner;
 }
 
 export async function listBookmarks(bookId) {
@@ -226,10 +292,7 @@ export async function exportBackupSnapshot() {
 }
 
 export async function importBackupSnapshot(snapshot) {
-  const normalizedSettings = {
-    ...DEFAULT_SETTINGS,
-    ...(snapshot.settings || {})
-  };
+  const normalizedSettings = normalizeStoredSettings(snapshot.settings || {}, Date.now());
   const books = Array.isArray(snapshot.books) ? snapshot.books : [];
   const progress = Array.isArray(snapshot.progress) ? snapshot.progress : [];
   const bookmarks = Array.isArray(snapshot.bookmarks) ? snapshot.bookmarks : [];
