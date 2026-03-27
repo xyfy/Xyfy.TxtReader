@@ -86,9 +86,9 @@ function updateNavButtonLabels() {
 }
 
 function updateImmersiveButton() {
-  elements.immersiveToggle.textContent = state.immersiveActive ? "🗗" : "⛶";
   elements.immersiveToggle.classList.toggle("active", state.immersiveActive);
   elements.immersiveToggle.setAttribute("aria-pressed", String(state.immersiveActive));
+  elements.immersiveToggle.setAttribute("aria-label", state.immersiveActive ? "退出沉浸模式" : "进入沉浸模式");
   elements.immersiveToggle.title = state.immersiveActive ? "退出沉浸模式" : "进入沉浸模式";
   elements.immersiveExit.classList.toggle("hidden", !state.immersiveActive);
 }

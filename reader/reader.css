@@ -61,6 +61,61 @@ button,
   cursor: pointer;
 }
 
+.icon-button {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-frame {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+}
+
+.icon-frame::before,
+.icon-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-color: currentColor;
+}
+
+.icon-frame::before {
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+}
+
+.icon-frame::after {
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+}
+
+.icon-frame.exit {
+  transform: scale(0.86);
+}
+
+.icon-frame.exit::before {
+  inset: 3px 3px auto auto;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+}
+
+.icon-frame.exit::after {
+  inset: auto auto 3px 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+}
+
 button:hover,
 .file-picker span:hover {
   border-color: var(--accent-color);
@@ -442,12 +497,6 @@ body.is-immersive .paper-page {
   top: 14px;
   right: 14px;
   z-index: 30;
-  width: 42px;
-  height: 42px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(8px);
