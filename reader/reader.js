@@ -290,6 +290,36 @@ function measureRenderedTextHeight(sourceEl, text) {
   return height;
 }
 
+function createPageFitChecker(sourceEl) {
+  const sourceStyle = window.getComputedStyle(sourceEl);
+  const probe = document.createElement("div");
+  probe.style.position = "fixed";
+  probe.style.left = "-99999px";
+  probe.style.top = "0";
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  probe.style.width = `${sourceEl.clientWidth}px`;
+  probe.style.font = sourceStyle.font;
+  probe.style.lineHeight = sourceStyle.lineHeight;
+  probe.style.letterSpacing = sourceStyle.letterSpacing;
+  probe.style.wordBreak = sourceStyle.wordBreak;
+  probe.style.whiteSpace = sourceStyle.whiteSpace;
+  probe.style.padding = "0";
+  probe.style.margin = "0";
+  probe.style.border = "0";
+  document.body.append(probe);
+
+  return {
+    fits(text) {
+      probe.textContent = text || "";
+      return probe.scrollHeight <= sourceEl.clientHeight + 1;
+    },
+    dispose() {
+      probe.remove();
+    }
+  };
+}
+
 function renderDebugPanel() {
   if (!state.debugEnabled || !elements.debugPanel) {
     return;
@@ -315,6 +345,7 @@ function renderDebugPanel() {
     "[Pagination Debug]",
     `chapter=${chapter?.title || "-"}`,
     `pageIndex=${state.currentPageIndex}/${Math.max(0, state.pages.length - 1)} pagesPerView=${state.pagesPerView}`,
+    "mode=dom-fit-binary-search",
     "",
     `[layout] viewport=${viewportHeight}px shell=${shellHeight}px header=${headerHeight}px spread=${spreadHeight}px footer=${footerHeight}px`,
     `[content-box] width=${pageDimensions?.width ?? "-"} height=${pageDimensions?.height ?? "-"} charWidth=${pageDimensions ? pageDimensions.charWidth.toFixed(2) : "-"}`,
@@ -337,7 +368,13 @@ function rebuildPages() {
 
   const pageDimensions = getPageContentDimensions();
   state.lastPageDimensions = pageDimensions;
-  state.pages = paginateChapter(chapter.content, state.settings, pageDimensions);
+  let fitChecker = null;
+  try {
+    fitChecker = createPageFitChecker(elements.leftPage);
+    state.pages = paginateChapter(chapter.content, state.settings, pageDimensions, (text) => fitChecker.fits(text));
+  } finally {
+    fitChecker?.dispose();
+  }
   if (state.currentPageIndex >= state.pages.length) {
     state.currentPageIndex = 0;
   }

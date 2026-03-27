@@ -1,4 +1,4 @@
-const SENTENCE_BREAK = /[。！？!?；;，,、]\s*/g;
+const SENTENCE_BREAK = /[。！？!?；;，,、\n]\s*/g;
 
 function sentenceAwareCut(text, maxChars) {
   if (text.length <= maxChars) {
@@ -7,6 +7,27 @@ function sentenceAwareCut(text, maxChars) {
 
   const searchStart = Math.max(80, maxChars - 140);
   const searchEnd = Math.min(text.length, maxChars + 120);
+  const windowText = text.slice(searchStart, searchEnd);
+  let best = -1;
+
+  for (const match of windowText.matchAll(SENTENCE_BREAK)) {
+    best = searchStart + (match.index ?? 0) + match[0].length;
+  }
+
+  if (best >= Math.floor(maxChars * 0.55)) {
+    return best;
+  }
+
+  return maxChars;
+}
+
+function sentenceAwareCutBefore(text, maxChars) {
+  if (text.length <= maxChars) {
+    return text.length;
+  }
+
+  const searchStart = Math.max(80, maxChars - 180);
+  const searchEnd = maxChars;
   const windowText = text.slice(searchStart, searchEnd);
   let best = -1;
 
@@ -51,9 +72,14 @@ function splitParagraph(paragraph, maxChars) {
  * @param {string} content
  * @param {object} settings - { fontSize, lineHeight }
  * @param {{ width: number, height: number, charWidth?: number } | null} [pageDimensions]
+ * @param {(text: string) => boolean} [fitsPage]
  */
-export function paginateChapter(content, settings, pageDimensions = null) {
+export function paginateChapter(content, settings, pageDimensions = null, fitsPage = null) {
   const normalized = content.replace(/\r\n/g, "\n").trim();
+
+  if (typeof fitsPage === "function" && normalized.length) {
+    return paginateByRenderedHeight(normalized, settings, pageDimensions, fitsPage);
+  }
 
   let targetChars;
   if (pageDimensions && pageDimensions.width > 50 && pageDimensions.height > 50) {
@@ -90,6 +116,64 @@ export function paginateChapter(content, settings, pageDimensions = null) {
 
   if (current.length) {
     pages.push(current.join("\n\n"));
+  }
+
+  return pages.length ? pages : [normalized];
+}
+
+function paginateByRenderedHeight(normalized, settings, pageDimensions, fitsPage) {
+  const fallbackTarget = Math.max(700, Math.round(2200 - settings.fontSize * 45));
+  const estimatedTarget = pageDimensions
+    ? Math.max(
+        200,
+        Math.floor((pageDimensions.width / Math.max(8, pageDimensions.charWidth || settings.fontSize)) * 0.93) *
+          Math.floor(pageDimensions.height / (settings.fontSize * (settings.lineHeight || 1.8)))
+      )
+    : fallbackTarget;
+
+  const pages = [];
+  let rest = normalized;
+
+  while (rest.length) {
+    if (fitsPage(rest)) {
+      pages.push(rest);
+      break;
+    }
+
+    let low = 1;
+    let high = Math.min(rest.length, Math.max(300, estimatedTarget));
+    while (high < rest.length && fitsPage(rest.slice(0, high))) {
+      const next = Math.min(rest.length, Math.floor(high * 1.35));
+      if (next === high) {
+        break;
+      }
+      high = next;
+    }
+
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      if (fitsPage(rest.slice(0, mid))) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    let cut = sentenceAwareCutBefore(rest, low);
+    if (cut <= 0 || cut > rest.length) {
+      cut = low;
+    }
+
+    const page = rest.slice(0, cut).trimEnd();
+    if (!page.length) {
+      const hard = Math.max(1, Math.min(rest.length, low));
+      pages.push(rest.slice(0, hard));
+      rest = rest.slice(hard).trimStart();
+      continue;
+    }
+
+    pages.push(page);
+    rest = rest.slice(cut).trimStart();
   }
 
   return pages.length ? pages : [normalized];
