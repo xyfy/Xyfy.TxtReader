@@ -121,7 +121,27 @@ export function paginateChapter(content, settings, pageDimensions = null, fitsPa
   return pages.length ? pages : [normalized];
 }
 
+export function createRenderedChapterPager(content, settings, pageDimensions, fitsPage) {
+  const normalized = content.replace(/\r\n/g, "\n").trim();
+  return buildRenderedPager(normalized, settings, pageDimensions, fitsPage);
+}
+
 function paginateByRenderedHeight(normalized, settings, pageDimensions, fitsPage) {
+  const pager = buildRenderedPager(normalized, settings, pageDimensions, fitsPage);
+  const pages = [];
+
+  while (!pager.done) {
+    const page = pager.next();
+    if (!page) {
+      break;
+    }
+    pages.push(page);
+  }
+
+  return pages.length ? pages : [normalized];
+}
+
+function buildRenderedPager(normalized, settings, pageDimensions, fitsPage) {
   const fallbackTarget = Math.max(700, Math.round(2200 - settings.fontSize * 45));
   const estimatedTarget = pageDimensions
     ? Math.max(
@@ -130,11 +150,17 @@ function paginateByRenderedHeight(normalized, settings, pageDimensions, fitsPage
           Math.floor(pageDimensions.height / (settings.fontSize * (settings.lineHeight || 1.8)))
       )
     : fallbackTarget;
-
-  const pages = [];
   let rest = normalized;
 
-  while (rest.length) {
+  return {
+    get done() {
+      return !rest.length;
+    },
+    next() {
+      if (!rest.length) {
+        return null;
+      }
+
     const fitCache = new Map();
     const fitsPrefix = (length) => {
       const safeLength = Math.max(0, Math.min(rest.length, length));
@@ -147,46 +173,46 @@ function paginateByRenderedHeight(normalized, settings, pageDimensions, fitsPage
       return ok;
     };
 
-    if (fitsPrefix(rest.length)) {
-      pages.push(rest);
-      break;
-    }
-
-    let low = 1;
-    let high = Math.min(rest.length, Math.max(300, estimatedTarget));
-    while (high < rest.length && fitsPrefix(high)) {
-      const next = Math.min(rest.length, Math.floor(high * 1.35));
-      if (next === high) {
-        break;
+      if (fitsPrefix(rest.length)) {
+        const finalPage = rest;
+        rest = "";
+        return finalPage;
       }
-      high = next;
-    }
 
-    while (low < high) {
-      const mid = Math.ceil((low + high) / 2);
-      if (fitsPrefix(mid)) {
-        low = mid;
-      } else {
-        high = mid - 1;
+      let low = 1;
+      let high = Math.min(rest.length, Math.max(300, estimatedTarget));
+      while (high < rest.length && fitsPrefix(high)) {
+        const next = Math.min(rest.length, Math.floor(high * 1.35));
+        if (next === high) {
+          break;
+        }
+        high = next;
       }
+
+      while (low < high) {
+        const mid = Math.ceil((low + high) / 2);
+        if (fitsPrefix(mid)) {
+          low = mid;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      let cut = sentenceAwareCutBefore(rest, low);
+      if (cut <= 0 || cut > rest.length) {
+        cut = low;
+      }
+
+      const page = rest.slice(0, cut).trimEnd();
+      if (!page.length) {
+        const hard = Math.max(1, Math.min(rest.length, low));
+        const hardPage = rest.slice(0, hard);
+        rest = rest.slice(hard).trimStart();
+        return hardPage;
+      }
+
+      rest = rest.slice(cut).trimStart();
+      return page;
     }
-
-    let cut = sentenceAwareCutBefore(rest, low);
-    if (cut <= 0 || cut > rest.length) {
-      cut = low;
-    }
-
-    const page = rest.slice(0, cut).trimEnd();
-    if (!page.length) {
-      const hard = Math.max(1, Math.min(rest.length, low));
-      pages.push(rest.slice(0, hard));
-      rest = rest.slice(hard).trimStart();
-      continue;
-    }
-
-    pages.push(page);
-    rest = rest.slice(cut).trimStart();
-  }
-
-  return pages.length ? pages : [normalized];
+  };
 }

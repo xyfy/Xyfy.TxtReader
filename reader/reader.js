@@ -1,7 +1,7 @@
 import { readTxtFile } from "../modules/file-handler.js";
 import { createBackupFilename, createBackupPayload, parseBackupPayload } from "../modules/backup.js";
 import { parseChapters } from "../modules/chapter-parser.js";
-import { paginateChapter } from "../modules/paginator.js";
+import { createRenderedChapterPager, paginateChapter } from "../modules/paginator.js";
 import {
   deleteBookmark,
   exportBackupSnapshot,
@@ -25,6 +25,7 @@ const state = {
   bookmarks: [],
   pages: [],
   chapterPageCache: new Map(),
+  activePaginationSession: null,
   debugEnabled: false,
   immersiveActive: false,
   panelHiddenBeforeImmersive: false,
@@ -78,6 +79,7 @@ const elements = {
 
 let resizeTimer = null;
 let modeHintTimer = null;
+let warmupTimer = null;
 
 function isScrollMode() {
   return state.settings.readingMode === "scroll";
@@ -237,6 +239,67 @@ function setCachedPages(cacheKey, pages) {
     const oldestKey = state.chapterPageCache.keys().next().value;
     state.chapterPageCache.delete(oldestKey);
   }
+}
+
+function cancelPaginationWarmup() {
+  if (warmupTimer) {
+    clearTimeout(warmupTimer);
+    warmupTimer = null;
+  }
+}
+
+function clearActivePaginationSession() {
+  state.activePaginationSession?.fitChecker?.dispose?.();
+  state.activePaginationSession = null;
+}
+
+function ensurePagesLoaded(requiredCount) {
+  const session = state.activePaginationSession;
+  if (!session) {
+    return;
+  }
+
+  while (!session.done && session.pages.length < requiredCount) {
+    const nextPage = session.pager.next();
+    if (!nextPage) {
+      session.done = true;
+      break;
+    }
+    session.pages.push(nextPage);
+    session.done = session.pager.done;
+  }
+
+  state.pages = session.pages;
+  if (session.done) {
+    setCachedPages(session.cacheKey, session.pages);
+    session.fitChecker?.dispose?.();
+    session.fitChecker = null;
+  }
+}
+
+function schedulePaginationWarmup() {
+  cancelPaginationWarmup();
+  const session = state.activePaginationSession;
+  if (!session || session.done) {
+    return;
+  }
+
+  warmupTimer = setTimeout(() => {
+    const activeSession = state.activePaginationSession;
+    if (!activeSession || activeSession.cacheKey !== session.cacheKey) {
+      return;
+    }
+
+    ensurePagesLoaded(activeSession.pages.length + 6);
+    if (activeSession.done) {
+      if (state.book?.id === activeSession.bookId && state.currentChapterIndex === activeSession.chapterIndex) {
+        renderSpread();
+      }
+      return;
+    }
+
+    schedulePaginationWarmup();
+  }, 0);
 }
 
 function setBackupStatus(message, isError = false) {
@@ -426,6 +489,12 @@ function renderSpread() {
   const right = state.pagesPerView === 2 ? state.pages[state.currentPageIndex + 1] || "" : "";
   const spreadIndex = Math.floor(state.currentPageIndex / state.pagesPerView) + 1;
   const spreadTotal = Math.max(1, Math.ceil(state.pages.length / state.pagesPerView));
+  const isWarmupPending = Boolean(
+    state.activePaginationSession &&
+      !state.activePaginationSession.done &&
+      state.activePaginationSession.bookId === state.book?.id &&
+      state.activePaginationSession.chapterIndex === state.currentChapterIndex
+  );
 
   elements.bookTitle.textContent = state.book?.name || "Xyfy TXT Reader";
   elements.leftTitle.textContent = chapter?.title || "";
@@ -439,7 +508,7 @@ function renderSpread() {
     elements.leftPage.scrollTop = 0;
     updateScrollIndicator();
   } else {
-    elements.pageIndicator.textContent = `${spreadIndex} / ${spreadTotal}`;
+    elements.pageIndicator.textContent = isWarmupPending ? `${spreadIndex} / ${spreadTotal}+` : `${spreadIndex} / ${spreadTotal}`;
   }
   animateTurn();
   renderToc();
@@ -595,6 +664,8 @@ function renderDebugPanel() {
 }
 
 function rebuildPages() {
+  cancelPaginationWarmup();
+  clearActivePaginationSession();
   const chapter = state.book?.chapters?.[state.currentChapterIndex];
   if (!chapter) {
     state.pages = [];
@@ -631,16 +702,19 @@ function rebuildPages() {
     return;
   }
 
-  let fitChecker = null;
-  try {
-    fitChecker = createPageFitChecker(elements.leftPage);
-    state.pages = paginateChapter(chapter.content, state.settings, pageDimensions, (text) => fitChecker.fits(text));
-  } finally {
-    fitChecker?.dispose();
-  }
-  if (cacheKey) {
-    setCachedPages(cacheKey, state.pages);
-  }
+  const fitChecker = createPageFitChecker(elements.leftPage);
+  const pager = createRenderedChapterPager(chapter.content, state.settings, pageDimensions, (text) => fitChecker.fits(text));
+  state.activePaginationSession = {
+    cacheKey,
+    bookId: state.book.id,
+    chapterIndex: state.currentChapterIndex,
+    pager,
+    fitChecker,
+    pages: [],
+    done: pager.done
+  };
+  const requiredCount = Math.max(state.currentPageIndex + state.pagesPerView, state.pagesPerView * 2);
+  ensurePagesLoaded(requiredCount);
   if (state.currentPageIndex >= state.pages.length) {
     state.currentPageIndex = 0;
   }
@@ -649,6 +723,7 @@ function rebuildPages() {
   }
   renderSpread();
   persistProgress();
+  schedulePaginationWarmup();
 }
 
 async function refreshBookmarks() {
@@ -769,6 +844,8 @@ function nextPage() {
     scrollByScreen(1);
     return;
   }
+
+  ensurePagesLoaded(state.currentPageIndex + state.pagesPerView + state.pagesPerView);
 
   if (state.currentPageIndex + state.pagesPerView < state.pages.length) {
     state.currentPageIndex += state.pagesPerView;
