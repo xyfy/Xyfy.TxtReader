@@ -38,6 +38,20 @@
           </div>
           <div id="bookmark-list" class="list"></div>
         </section>
+
+        <section class="panel-block">
+          <div class="section-head">
+            <p class="panel-label">备份</p>
+          </div>
+          <div class="action-row">
+            <button id="export-backup" type="button">导出 JSON</button>
+            <label class="file-picker inline-picker">
+              <input id="import-backup" type="file" accept="application/json,.json" />
+              <span>恢复备份</span>
+            </label>
+          </div>
+          <p id="backup-status" class="file-meta">可导出书籍、进度、书签与阅读设置</p>
+        </section>
       </aside>
 
       <main class="reader-shell">

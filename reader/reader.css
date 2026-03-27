@@ -190,6 +190,16 @@ body.is-immersive .side-panel {
   justify-content: center;
 }
 
+.inline-picker span {
+  width: auto;
+}
+
+.action-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .file-meta,
 .counter {
   margin: 8px 0 0;

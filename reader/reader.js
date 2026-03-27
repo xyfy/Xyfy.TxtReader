@@ -1,12 +1,15 @@
 import { readTxtFile } from "../modules/file-handler.js";
+import { createBackupFilename, createBackupPayload, parseBackupPayload } from "../modules/backup.js";
 import { parseChapters } from "../modules/chapter-parser.js";
 import { paginateChapter } from "../modules/paginator.js";
 import {
   deleteBookmark,
+  exportBackupSnapshot,
   getBook,
   getDefaultSettings,
   getProgress,
   getReaderSettings,
+  importBackupSnapshot,
   listBookmarks,
   listBooks,
   saveBook,
@@ -33,6 +36,9 @@ const state = {
 const elements = {
   fileInput: document.getElementById("file-input"),
   fileMeta: document.getElementById("file-meta"),
+  exportBackup: document.getElementById("export-backup"),
+  importBackup: document.getElementById("import-backup"),
+  backupStatus: document.getElementById("backup-status"),
   librarySelect: document.getElementById("library-select"),
   tocList: document.getElementById("toc-list"),
   chapterCount: document.getElementById("chapter-count"),
@@ -193,6 +199,11 @@ function formatSize(size) {
   }
 
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function setBackupStatus(message, isError = false) {
+  elements.backupStatus.textContent = message;
+  elements.backupStatus.style.color = isError ? "#b5442a" : "";
 }
 
 function renderLibrary() {
@@ -631,6 +642,56 @@ async function handleFileSelection(event) {
   await loadBook(saved.id);
 }
 
+async function handleExportBackup() {
+  const snapshot = await exportBackupSnapshot();
+  const payload = createBackupPayload(snapshot);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = createBackupFilename();
+  link.click();
+  URL.revokeObjectURL(url);
+  setBackupStatus(`已导出 ${payload.books.length} 本书、${payload.progress.length} 条进度、${payload.bookmarks.length} 个书签`);
+}
+
+async function handleImportBackup(event) {
+  const [file] = event.target.files || [];
+  if (!file) {
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const payload = parseBackupPayload(text);
+    const result = await importBackupSnapshot(payload);
+
+    state.settings = await getReaderSettings();
+    applySettings();
+    detectPagesPerView();
+    state.books = await listBooks();
+    renderLibrary();
+
+    const preferredBookId = state.book?.id || payload.books[0]?.id || state.books[0]?.id;
+    if (preferredBookId) {
+      await loadBook(preferredBookId);
+    } else {
+      renderBookmarks();
+      renderToc();
+      renderSpread();
+    }
+
+    setBackupStatus(
+      `已恢复 ${result.booksImported} 本书、${result.progressImported} 条进度、${result.bookmarksImported} 个书签`
+    );
+  } catch (error) {
+    console.error(error);
+    setBackupStatus(error instanceof Error ? error.message : "恢复备份失败", true);
+  } finally {
+    event.target.value = "";
+  }
+}
+
 function goToChapter(index) {
   state.currentChapterIndex = index;
   state.currentPageIndex = 0;
@@ -745,6 +806,10 @@ function toggleDebugPanel() {
 
 function bindEvents() {
   elements.fileInput.addEventListener("change", handleFileSelection);
+  elements.exportBackup.addEventListener("click", () => {
+    handleExportBackup();
+  });
+  elements.importBackup.addEventListener("change", handleImportBackup);
   elements.librarySelect.addEventListener("change", (event) => {
     if (event.target.value) {
       loadBook(event.target.value);

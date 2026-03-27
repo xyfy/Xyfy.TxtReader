@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:paginator": "node tests/paginator.test.mjs"
+    "test": "npm run test:paginator && npm run test:backup",
+    "test:paginator": "node tests/paginator.test.mjs",
+    "test:backup": "node tests/backup.test.mjs"
   }
 }
