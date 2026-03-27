@@ -420,12 +420,12 @@ function updateScrollIndicator() {
   }
 
   if (isAtScrollBoundary(1)) {
-    showModeHint("已到底，按空格切下一章", 1200);
+    showModeHint("已到底，按右方向键或空格切下一章", 1200);
     return;
   }
 
   if (isAtScrollBoundary(-1)) {
-    showModeHint("已到顶，Shift+空格回上一章", 1200);
+    showModeHint("已到顶，按左方向键或 Shift+空格回上一章", 1200);
     return;
   }
 
@@ -841,7 +841,7 @@ function nextPage() {
   }
 
   if (isScrollMode()) {
-    scrollByScreen(1);
+    handleScrollModeSpace(1);
     return;
   }
 
@@ -865,7 +865,7 @@ function prevPage() {
   }
 
   if (isScrollMode()) {
-    scrollByScreen(-1);
+    handleScrollModeSpace(-1);
     return;
   }
 
@@ -1017,12 +1017,12 @@ function bindEvents() {
       toggleDebugPanel();
     }
 
-    if (!isScrollMode() && (event.key === "ArrowRight" || event.key.toLowerCase() === "j")) {
+    if (event.key === "ArrowRight" || (!isScrollMode() && event.key.toLowerCase() === "j")) {
       event.preventDefault();
       nextPage();
     }
 
-    if (!isScrollMode() && (event.key === "ArrowLeft" || event.key.toLowerCase() === "k")) {
+    if (event.key === "ArrowLeft" || (!isScrollMode() && event.key.toLowerCase() === "k")) {
       event.preventDefault();
       prevPage();
     }
