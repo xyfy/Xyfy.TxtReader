@@ -1,38 +1,38 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Xyfy TXT Reader</title>
+    <title data-i18n="extName">Xyfy TXT Reader</title>
     <link rel="stylesheet" href="reader.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="side-panel">
         <section class="panel-block">
-          <p class="panel-label">导入</p>
+          <p class="panel-label" data-i18n="readerImportLabel">Import</p>
           <label class="file-picker">
             <input id="file-input" type="file" accept=".txt,text/plain" />
-            <span>选择本地 TXT</span>
+            <span data-i18n="readerChooseLocalTxt">Choose local TXT</span>
           </label>
-          <p id="file-meta" class="file-meta">尚未导入文件</p>
+          <p id="file-meta" class="file-meta" data-i18n="readerNoFile">No file imported yet</p>
         </section>
 
         <section class="panel-block">
           <div class="section-head">
-            <p class="panel-label">最近阅读</p>
+            <p class="panel-label" data-i18n="readerRecentReads">Recent Reads</p>
           </div>
           <div id="recent-list" class="list"></div>
         </section>
 
         <section class="panel-block">
-          <p class="panel-label">书架</p>
+          <p class="panel-label" data-i18n="readerLibrary">Library</p>
           <select id="library-select"></select>
         </section>
 
         <section class="panel-block">
           <div class="section-head">
-            <p class="panel-label">目录</p>
+            <p class="panel-label" data-i18n="readerToc">Contents</p>
             <span id="chapter-count" class="counter">0</span>
           </div>
           <div id="toc-list" class="list"></div>
@@ -40,29 +40,29 @@
 
         <section class="panel-block">
           <div class="section-head">
-            <p class="panel-label">书签</p>
-            <button id="bookmark-button" class="small-button" type="button">添加</button>
+            <p class="panel-label" data-i18n="readerBookmarks">Bookmarks</p>
+            <button id="bookmark-button" class="small-button" type="button" data-i18n="readerAddBookmark">Add</button>
           </div>
           <div id="bookmark-list" class="list"></div>
         </section>
 
         <section class="panel-block">
           <div class="section-head">
-            <p class="panel-label">备份</p>
+            <p class="panel-label" data-i18n="readerBackup">Backup</p>
           </div>
           <div class="action-row">
-            <button id="export-backup" type="button">导出 JSON</button>
+            <button id="export-backup" type="button" data-i18n="readerExportJson">Export JSON</button>
             <label class="file-picker inline-picker">
               <input id="import-backup" type="file" accept="application/json,.json" />
-              <span>恢复备份</span>
+              <span data-i18n="readerImportBackup">Restore Backup</span>
             </label>
           </div>
-          <p id="backup-status" class="file-meta">可导出书籍、进度、书签与阅读设置</p>
+          <p id="backup-status" class="file-meta" data-i18n="readerBackupHint">Export or restore books, progress, bookmarks, and reading settings</p>
         </section>
 
         <section class="panel-block">
           <div class="section-head">
-            <p class="panel-label">阅读统计</p>
+            <p class="panel-label" data-i18n="readerStats">Reading Stats</p>
           </div>
           <div id="stats-list" class="stats-list"></div>
         </section>
@@ -71,77 +71,77 @@
       <main class="reader-shell">
         <header class="reader-header">
           <div>
-            <p class="eyebrow">Book View</p>
+            <p class="eyebrow" data-i18n="readerHeaderEyebrow">Book View</p>
             <h1 id="book-title">Xyfy TXT Reader</h1>
           </div>
           <div class="header-actions">
-            <button id="toggle-panel" type="button" title="隐藏/显示侧边栏 (Tab)">☰</button>
-            <button id="immersive-toggle" class="icon-button" type="button" title="沉浸模式" aria-label="沉浸模式">
+            <button id="toggle-panel" type="button" title="Show or hide sidebar (Tab)" data-i18n-attr="title:readerTogglePanelTitle">☰</button>
+            <button id="immersive-toggle" class="icon-button" type="button" title="Enter immersive mode" aria-label="Enter immersive mode" data-i18n-attr="title:readerImmersiveEnter;aria-label:readerImmersiveEnter">
               <span class="icon-frame" aria-hidden="true"></span>
             </button>
-            <button id="shortcuts-toggle" type="button" title="快捷键帮助">快捷键</button>
-            <button id="debug-toggle" type="button" title="分页调试面板">调试</button>
-            <button id="prev-chapter" type="button">上一章</button>
-            <button id="next-chapter" type="button">下一章</button>
+            <button id="shortcuts-toggle" type="button" title="Keyboard shortcuts help" data-i18n="readerShortcutsButton" data-i18n-attr="title:readerShortcutsTitle">Shortcuts</button>
+            <button id="debug-toggle" type="button" title="Pagination debug panel" data-i18n="readerDebugButton" data-i18n-attr="title:readerDebugTitle">Debug</button>
+            <button id="prev-chapter" type="button" data-i18n="readerPrevChapter">Previous Chapter</button>
+            <button id="next-chapter" type="button" data-i18n="readerNextChapter">Next Chapter</button>
           </div>
         </header>
 
         <section class="spread-shell">
           <article class="paper-page left-page">
             <p id="left-title" class="page-title"></p>
-            <div id="left-page" class="page-content empty">导入 TXT 后开始阅读</div>
+            <div id="left-page" class="page-content empty" data-i18n="readerEmptyPageStart">Import a TXT file to start reading</div>
           </article>
           <article class="paper-page right-page">
             <p id="right-title" class="page-title"></p>
-            <div id="right-page" class="page-content empty">支持目录、书签、设置与快捷键</div>
+            <div id="right-page" class="page-content empty" data-i18n="readerEmptyPageSupport">Contents, bookmarks, settings, and shortcuts are supported</div>
           </article>
         </section>
 
         <footer class="reader-footer">
           <div class="nav-group">
-            <button id="prev-page" type="button">上一页</button>
+            <button id="prev-page" type="button" data-i18n="readerPrevPage">Previous Page</button>
             <span id="page-indicator">0 / 0</span>
-            <button id="next-page" type="button">下一页</button>
+            <button id="next-page" type="button" data-i18n="readerNextPage">Next Page</button>
             <span id="mode-hint" class="mode-hint hidden" aria-live="polite"></span>
           </div>
           <div class="nav-group">
             <label>
-              模式
+              <span data-i18n="readerModeLabel">Mode</span>
               <select id="reading-mode">
-                <option value="book">书本双页</option>
-                <option value="scroll">单页滚动</option>
+                <option value="book" data-i18n="readerModeBook">Two-page Book</option>
+                <option value="scroll" data-i18n="readerModeScroll">Scrolling</option>
               </select>
             </label>
             <label>
-              背景
+              <span data-i18n="readerThemeLabel">Background</span>
               <select id="theme-select">
-                <option value="paper">纸张</option>
-                <option value="sepia">护眼</option>
-                <option value="night">夜间</option>
+                <option value="paper" data-i18n="readerThemePaper">Paper</option>
+                <option value="sepia" data-i18n="readerThemeSepia">Sepia</option>
+                <option value="night" data-i18n="readerThemeNight">Night</option>
               </select>
             </label>
             <label>
-              字体
+              <span data-i18n="readerFontLabel">Font</span>
               <select id="font-select">
-                <option value='"Noto Serif SC", Georgia, serif'>衬线</option>
-                <option value='"PingFang SC", "Microsoft YaHei", sans-serif'>黑体</option>
-                <option value='"LXGW WenKai", "Kaiti SC", serif'>楷体</option>
+                <option value='"Noto Serif SC", Georgia, serif' data-i18n="readerFontSerif">Serif</option>
+                <option value='"PingFang SC", "Microsoft YaHei", sans-serif' data-i18n="readerFontSans">Sans</option>
+                <option value='"LXGW WenKai", "Kaiti SC", serif' data-i18n="readerFontKai">Kai</option>
               </select>
             </label>
             <label>
-              字号
+              <span data-i18n="readerFontSizeLabel">Font Size</span>
               <input id="font-size" type="range" min="14" max="28" step="1" />
             </label>
             <label>
-              动画
+              <span data-i18n="readerAnimationLabel">Animation</span>
               <select id="animation-style">
-                <option value="none">关闭</option>
-                <option value="slide" selected>滑动</option>
-                <option value="fade">淡入</option>
+                <option value="none" data-i18n="readerAnimationNone">Off</option>
+                <option value="slide" selected data-i18n="readerAnimationSlide">Slide</option>
+                <option value="fade" data-i18n="readerAnimationFade">Fade</option>
               </select>
             </label>
             <label>
-              强度
+              <span data-i18n="readerIntensityLabel">Intensity</span>
               <input id="animation-intensity" type="range" min="1" max="3" step="1" />
             </label>
           </div>
@@ -151,23 +151,23 @@
         <div id="shortcuts-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
           <div class="overlay-card">
             <div class="section-head overlay-head">
-              <h2 id="shortcuts-title">快捷键帮助</h2>
-              <button id="shortcuts-close" class="small-button" type="button">关闭</button>
+              <h2 id="shortcuts-title" data-i18n="readerShortcutsTitle">Keyboard Shortcuts</h2>
+              <button id="shortcuts-close" class="small-button" type="button" data-i18n="readerShortcutsClose">Close</button>
             </div>
             <div class="shortcut-grid">
-              <div><strong>← / →</strong><span>翻页；在边界继续按则切换章节</span></div>
-              <div><strong>Space</strong><span>书本模式切下一章；滚动模式下滚一屏</span></div>
-              <div><strong>Shift + Space</strong><span>滚动模式上滚一屏或回上一章</span></div>
-              <div><strong>↑ / ↓</strong><span>单页滚动模式下小步滚动</span></div>
-              <div><strong>B</strong><span>添加当前书签</span></div>
-              <div><strong>Tab</strong><span>显示/隐藏左侧栏</span></div>
-              <div><strong>H / ?</strong><span>打开快捷键帮助</span></div>
-              <div><strong>Alt + D</strong><span>切换分页调试面板</span></div>
-              <div><strong>Esc</strong><span>关闭快捷键帮助浮层</span></div>
+              <div><strong>← / →</strong><span data-i18n="readerShortcutsDescArrows">Turn pages; keep pressing at the boundary to switch chapters</span></div>
+              <div><strong>Space</strong><span data-i18n="readerShortcutsDescSpace">Next chapter in book mode; scroll one screen in scrolling mode</span></div>
+              <div><strong>Shift + Space</strong><span data-i18n="readerShortcutsDescShiftSpace">Scroll one screen up or go to previous chapter in scrolling mode</span></div>
+              <div><strong>↑ / ↓</strong><span data-i18n="readerShortcutsDescVertical">Scroll by small steps in scrolling mode</span></div>
+              <div><strong>B</strong><span data-i18n="readerShortcutsDescBookmark">Add a bookmark for the current location</span></div>
+              <div><strong>Tab</strong><span data-i18n="readerShortcutsDescSidebar">Show or hide the sidebar</span></div>
+              <div><strong>H / ?</strong><span data-i18n="readerShortcutsDescHelp">Open keyboard shortcuts help</span></div>
+              <div><strong>Alt + D</strong><span data-i18n="readerShortcutsDescDebug">Toggle the pagination debug panel</span></div>
+              <div><strong>Esc</strong><span data-i18n="readerShortcutsDescEsc">Close the shortcuts overlay</span></div>
             </div>
           </div>
         </div>
-        <button id="immersive-exit" class="immersive-exit icon-button hidden" type="button" title="退出沉浸模式" aria-label="退出沉浸模式">
+        <button id="immersive-exit" class="immersive-exit icon-button hidden" type="button" title="Exit immersive mode" aria-label="Exit immersive mode" data-i18n-attr="title:readerImmersiveExit;aria-label:readerImmersiveExit">
           <span class="icon-frame exit" aria-hidden="true"></span>
         </button>
       </main>

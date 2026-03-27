@@ -2,6 +2,7 @@ import { readTxtFile } from "../modules/file-handler.js";
 import { createBackupFilename, createBackupPayload, parseBackupPayload } from "../modules/backup.js";
 import { parseChapters } from "../modules/chapter-parser.js";
 import { createRenderedChapterPager, paginateChapter } from "../modules/paginator.js";
+import { applyI18n, getDocumentLanguage, t } from "../modules/i18n.js";
 import {
   deleteBookmark,
   exportBackupSnapshot,
@@ -120,20 +121,22 @@ function isScrollMode() {
 
 function updateNavButtonLabels() {
   if (isScrollMode()) {
-    elements.prevPage.textContent = "上滚";
-    elements.nextPage.textContent = "下滚";
+    elements.prevPage.textContent = t("readerScrollUp");
+    elements.nextPage.textContent = t("readerScrollDown");
     return;
   }
 
-  elements.prevPage.textContent = "上一页";
-  elements.nextPage.textContent = "下一页";
+  elements.prevPage.textContent = t("readerPrevPage");
+  elements.nextPage.textContent = t("readerNextPage");
 }
 
 function updateImmersiveButton() {
   elements.immersiveToggle.classList.toggle("active", state.immersiveActive);
   elements.immersiveToggle.setAttribute("aria-pressed", String(state.immersiveActive));
-  elements.immersiveToggle.setAttribute("aria-label", state.immersiveActive ? "退出沉浸模式" : "进入沉浸模式");
-  elements.immersiveToggle.title = state.immersiveActive ? "退出沉浸模式" : "进入沉浸模式";
+  elements.immersiveToggle.setAttribute("aria-label", state.immersiveActive ? t("readerImmersiveExit") : t("readerImmersiveEnter"));
+  elements.immersiveToggle.title = state.immersiveActive ? t("readerImmersiveExit") : t("readerImmersiveEnter");
+  elements.immersiveExit.setAttribute("aria-label", t("readerImmersiveExit"));
+  elements.immersiveExit.title = t("readerImmersiveExit");
   elements.immersiveExit.classList.toggle("hidden", !state.immersiveActive);
 }
 
@@ -363,7 +366,7 @@ async function refreshRecentReads() {
   if (!recentEntries.length) {
     const empty = document.createElement("p");
     empty.className = "file-meta";
-    empty.textContent = "还没有最近阅读记录";
+    empty.textContent = t("readerRecentEmpty");
     elements.recentList.append(empty);
     return;
   }
@@ -372,7 +375,10 @@ async function refreshRecentReads() {
     const book = bookMap.get(entry.bookId);
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `${book?.name || entry.bookId} · 第 ${Number(entry.chapterIndex || 0) + 1} 章`;
+    button.textContent = t("readerRecentChapterItem", {
+      name: book?.name || entry.bookId,
+      chapter: Number(entry.chapterIndex || 0) + 1
+    });
     if (state.book?.id === entry.bookId) {
       button.classList.add("active");
     }
@@ -394,12 +400,12 @@ function renderStats() {
     ? elements.pageIndicator.textContent || "0%"
     : `${Math.floor(state.currentPageIndex / Math.max(1, state.pagesPerView)) + 1} / ${Math.max(1, Math.ceil(state.pages.length / Math.max(1, state.pagesPerView)))}`;
 
-  stats.push(["模式", isScrollMode() ? "单页滚动" : state.pagesPerView === 2 ? "书本双页" : "书本单页"]);
-  stats.push(["章节", chapterProgress]);
-  stats.push(["页进度", pageProgress]);
-  stats.push(["本章字数", chapterChars ? `${chapterChars.toLocaleString()} 字` : "-"]);
-  stats.push(["全书字数", totalChars ? `${totalChars.toLocaleString()} 字` : "-"]);
-  stats.push(["书签数", `${state.bookmarks.length}`]);
+  stats.push([t("readerStatsMode"), isScrollMode() ? t("readerStatsModeScroll") : state.pagesPerView === 2 ? t("readerStatsModeBookDouble") : t("readerStatsModeBookSingle")]);
+  stats.push([t("readerStatsChapter"), chapterProgress]);
+  stats.push([t("readerStatsPageProgress"), pageProgress]);
+  stats.push([t("readerStatsChapterChars"), chapterChars ? t("readerCharsUnit", { count: chapterChars.toLocaleString(getDocumentLanguage()) }) : "-"]);
+  stats.push([t("readerStatsTotalChars"), totalChars ? t("readerCharsUnit", { count: totalChars.toLocaleString(getDocumentLanguage()) }) : "-"]);
+  stats.push([t("readerStatsBookmarkCount"), `${state.bookmarks.length}`]);
 
   elements.statsList.innerHTML = "";
   for (const [label, value] of stats) {
@@ -425,7 +431,7 @@ function renderLibrary() {
   if (!state.books.length) {
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "暂无已保存书籍";
+    option.textContent = t("readerLibraryEmpty");
     elements.librarySelect.append(option);
     return;
   }
@@ -433,7 +439,7 @@ function renderLibrary() {
   for (const book of state.books) {
     const option = document.createElement("option");
     option.value = book.id;
-    option.textContent = `${book.name} · ${book.chapterCount}章`;
+    option.textContent = t("readerLibraryItem", { name: book.name, count: book.chapterCount });
     if (state.book && state.book.id === book.id) {
       option.selected = true;
     }
@@ -464,7 +470,7 @@ function renderBookmarks() {
   if (!state.bookmarks.length) {
     const empty = document.createElement("p");
     empty.className = "file-meta";
-    empty.textContent = "当前书籍还没有书签";
+    empty.textContent = t("readerBookmarksEmpty");
     elements.bookmarkList.append(empty);
     return;
   }
@@ -485,7 +491,7 @@ function renderBookmarks() {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "small-button";
-    remove.textContent = "删除";
+    remove.textContent = t("readerDelete");
     remove.addEventListener("click", async () => {
       await deleteBookmark(bookmark.id);
       await refreshBookmarks();
@@ -532,12 +538,12 @@ function updateScrollIndicator() {
   }
 
   if (isAtScrollBoundary(1)) {
-    showModeHint("已到底，按右方向键或空格切下一章", 1200);
+    showModeHint(t("readerHintBottomNextChapter"), 1200);
     return;
   }
 
   if (isAtScrollBoundary(-1)) {
-    showModeHint("已到顶，按左方向键或 Shift+空格回上一章", 1200);
+    showModeHint(t("readerHintTopPrevChapter"), 1200);
     return;
   }
 
@@ -573,7 +579,7 @@ function isAtScrollBoundary(direction) {
 function handleScrollModeSpace(direction) {
   if (direction > 0 && isAtScrollBoundary(1)) {
     if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
-      showModeHint("切换到下一章", 700);
+      showModeHint(t("readerHintNextChapter"), 700);
       goToChapter(state.currentChapterIndex + 1);
     }
     return;
@@ -581,7 +587,7 @@ function handleScrollModeSpace(direction) {
 
   if (direction < 0 && isAtScrollBoundary(-1)) {
     if (state.currentChapterIndex > 0) {
-      showModeHint("切换到上一章", 700);
+      showModeHint(t("readerHintPrevChapter"), 700);
       goToChapter(state.currentChapterIndex - 1);
     }
     return;
@@ -608,11 +614,11 @@ function renderSpread() {
       state.activePaginationSession.chapterIndex === state.currentChapterIndex
   );
 
-  elements.bookTitle.textContent = state.book?.name || "Xyfy TXT Reader";
+  elements.bookTitle.textContent = state.book?.name || t("extName");
   elements.leftTitle.textContent = chapter?.title || "";
   elements.rightTitle.textContent = chapter?.title || "";
-  elements.leftPage.textContent = left || "当前页没有内容";
-  elements.rightPage.textContent = right || "已经到本章末尾";
+  elements.leftPage.textContent = left || t("readerCurrentPageEmpty");
+  elements.rightPage.textContent = right || t("readerChapterEnd");
   elements.leftPage.classList.toggle("empty", !left);
   elements.rightPage.classList.toggle("empty", !right && state.pagesPerView === 2);
   if (isScrollMode()) {
@@ -903,7 +909,11 @@ async function handleExportBackup() {
   link.download = createBackupFilename();
   link.click();
   URL.revokeObjectURL(url);
-  setBackupStatus(`已导出 ${payload.books.length} 本书、${payload.progress.length} 条进度、${payload.bookmarks.length} 个书签`);
+  setBackupStatus(t("readerBackupExported", {
+    books: payload.books.length,
+    progress: payload.progress.length,
+    bookmarks: payload.bookmarks.length
+  }));
 }
 
 async function handleImportBackup(event) {
@@ -935,11 +945,15 @@ async function handleImportBackup(event) {
     }
 
     setBackupStatus(
-      `已恢复 ${result.booksImported} 本书、${result.progressImported} 条进度、${result.bookmarksImported} 个书签`
+      t("readerBackupImported", {
+        books: result.booksImported,
+        progress: result.progressImported,
+        bookmarks: result.bookmarksImported
+      })
     );
   } catch (error) {
     console.error(error);
-    setBackupStatus(error instanceof Error ? error.message : "恢复备份失败", true);
+    setBackupStatus(error instanceof Error ? error.message : t("readerBackupImportFailed"), true);
   } finally {
     event.target.value = "";
   }
@@ -1007,7 +1021,10 @@ async function addBookmark() {
   }
 
   const chapter = state.book.chapters[state.currentChapterIndex];
-  const label = `${chapter.title} · 第 ${Math.floor(state.currentPageIndex / state.pagesPerView) + 1} 页组`;
+  const label = t("readerBookmarkLabel", {
+    chapter: chapter.title,
+    page: Math.floor(state.currentPageIndex / state.pagesPerView) + 1
+  });
   await saveBookmark({
     id: `${state.book.id}:${state.currentChapterIndex}:${state.currentPageIndex}`,
     bookId: state.book.id,
@@ -1216,6 +1233,7 @@ function bindEvents() {
 }
 
 async function bootstrap() {
+  applyI18n();
   state.settings = await getReaderSettings();
   state.books = await listBooks();
   detectPagesPerView();
@@ -1233,5 +1251,5 @@ async function bootstrap() {
 
 bootstrap().catch((error) => {
   console.error(error);
-  elements.fileMeta.textContent = "初始化失败，请查看控制台错误。";
+  elements.fileMeta.textContent = t("readerInitFailed");
 });

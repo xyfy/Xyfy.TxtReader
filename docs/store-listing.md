@@ -5,8 +5,8 @@
 - 扩展名称：Xyfy TXT Reader
 - 类别建议：Books / Productivity
 - 语言：中文（可同时提供英文）
-- 隐私政策（GitHub Pages）：https://xyfy.github.io/Xyfy.TxtReader/privacy-policy.html
-- 隐私政策（备用直链）：https://raw.githubusercontent.com/xyfy/Xyfy.TxtReader/main/privacy-policy.html
+- 隐私政策（GitHub Pages）：<https://xyfy.github.io/Xyfy.TxtReader/privacy-policy.html>
+- 隐私政策（备用直链）：<https://raw.githubusercontent.com/xyfy/Xyfy.TxtReader/main/privacy-policy.html>
 
 ## 简短描述（80-132 字符可裁剪）
 
@@ -52,6 +52,68 @@ Privacy and data handling:
 - No TXT body upload to developer servers
 - Only storage permission is used for reading-related data
 
+## 商店描述语言切换文案
+
+### 中文版（可直接粘贴）
+
+扩展名称：
+
+Xyfy TXT Reader
+
+简短描述：
+
+本地 TXT 小说阅读器，支持章节识别、书本双页与滚动阅读、沉浸模式、书签、阅读进度同步与备份恢复。
+
+详细描述：
+
+Xyfy TXT Reader 是一个面向本地 TXT 文件的浏览器阅读扩展。你可以导入小说文本，自动识别章节目录，并在书本双页模式与单页滚动模式之间自由切换。
+
+核心能力：
+
+- 自动章节解析，快速跳转
+- DOM 实测分页，双页阅读更接近纸书体验
+- 单页滚动与整屏/小步滚动
+- 沉浸模式，减少视觉干扰
+- 书签与最近阅读记录
+- 轻量阅读进度同步（chrome.storage.sync）
+- JSON 备份导出与导入恢复
+
+隐私与数据：
+
+- 正文和主要阅读数据默认保存在本地浏览器存储
+- 不上传用户 TXT 正文到开发者服务器
+- 仅使用 storage 权限用于保存必要阅读数据
+
+### English Version (Ready to Paste)
+
+Extension name:
+
+Xyfy TXT Reader
+
+Short description:
+
+Read local TXT novels with chapter detection, two-page book mode, scroll mode, immersive reading, bookmarks, progress sync, and backup restore.
+
+Detailed description:
+
+Xyfy TXT Reader is a browser extension for reading local TXT novels. It lets users import TXT files, automatically detect chapters, and switch between a paginated book-style layout and a smooth scrolling mode.
+
+Key features:
+
+- Automatic chapter parsing and fast navigation
+- Real DOM pagination for a book-like reading experience
+- Scroll mode with page-step and line-step controls
+- Immersive reading mode with reduced distractions
+- Bookmarks and recent reading history
+- Lightweight reading progress and settings sync
+- JSON backup export and restore
+
+Privacy and data handling:
+
+- Main content and reading data are stored locally in the browser
+- TXT content is not uploaded to developer servers
+- The extension uses only the storage permission for reading-related data
+
 ## 更新日志模板
 
 版本 0.2.1
@@ -83,7 +145,7 @@ Privacy and data handling:
 ### 二、图标素材
 
 | 规格 | 用途 | 格式要求 | 已准备 |
-|------|------|----------|--------|
+| ---- | ---- | -------- | ------ |
 | 16 × 16 px | 浏览器工具栏小图 | PNG，不透明或透明均可 | [ ] |
 | 32 × 32 px | Windows 高 DPI 工具栏 | PNG | [ ] |
 | 48 × 48 px | 扩展管理页面列表 | PNG | [ ] |
@@ -98,7 +160,7 @@ Privacy and data handling:
 建议分辨率：**1280 × 800** 或 **1440 × 900**；Chrome 商店至少提供 1 张，建议 3–5 张。
 
 | 编号 | 内容 | 拍摄要点 | 已准备 |
-|------|------|----------|--------|
+| ---- | ---- | -------- | ------ |
 | 截图 1 | 导入页 | 展示 TXT 导入入口、文件选择按钮 | [ ] |
 | 截图 2 | 书本双页模式 | 展示双栏排版与翻页效果 | [ ] |
 | 截图 3 | 滚动阅读模式 | 展示单列滚动与进度条 | [ ] |
@@ -112,7 +174,7 @@ Privacy and data handling:
 ### 四、宣传图（可选，提升曝光效果）
 
 | 规格 | 用途（Chrome Web Store） | 已准备 |
-|------|--------------------------|--------|
+| ---- | ------------------------ | ------ |
 | 440 × 280 px | 商店搜索结果卡片小图 | [ ] |
 | 920 × 680 px | 商店详情页顶部大图 | [ ] |
 | 1400 × 560 px | 特色推广横幅（Featured 位置） | [ ] |

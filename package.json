@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:zip": "rm -f dist/xyfy-txt-reader-v$npm_package_version.zip && mkdir -p dist && zip -r dist/xyfy-txt-reader-v$npm_package_version.zip manifest.json background modules popup reader icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png",
+    "build:zip": "rm -f dist/xyfy-txt-reader-v$npm_package_version.zip && mkdir -p dist && zip -r dist/xyfy-txt-reader-v$npm_package_version.zip manifest.json _locales background modules popup reader icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png",
     "gen:icons": "node scripts/gen-icons.mjs",
     "test": "npm run test:paginator && npm run test:backup && npm run test:storage-sync",
     "test:paginator": "node tests/paginator.test.mjs",
