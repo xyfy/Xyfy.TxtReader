@@ -218,13 +218,31 @@ async function persistProgress() {
 function getPageContentDimensions() {
   const el = elements.leftPage;
   if (!el || el.clientHeight === 0) return null;
-  // padding: 28px top/bottom, 32px sides (64px total horizontal)
-  // page-title: ~12px font + 1.5 line-height + 18px margin-bottom ≈ 38px
-  const horizPad = 64;
-  const vertPad = 28 + 28 + 38;
+
+  // Use the real rendered text container size, which already excludes header/footer/title areas.
+  const rect = el.getBoundingClientRect();
+  const style = window.getComputedStyle(el);
+
+  let charWidth = Number.parseFloat(style.fontSize) || state.settings.fontSize;
+  try {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (context) {
+      context.font = style.font;
+      const sample = "测试中文AaBb123456";
+      const measured = context.measureText(sample).width / sample.length;
+      if (Number.isFinite(measured) && measured > 0) {
+        charWidth = measured;
+      }
+    }
+  } catch {
+    // Ignore font measurement failures and use font-size fallback.
+  }
+
   return {
-    width: Math.max(50, el.clientWidth - horizPad),
-    height: Math.max(50, el.clientHeight - vertPad)
+    width: Math.max(50, Math.floor(rect.width)),
+    height: Math.max(50, Math.floor(rect.height)),
+    charWidth
   };
 }
 

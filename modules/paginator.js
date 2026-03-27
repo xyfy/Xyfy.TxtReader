@@ -50,7 +50,7 @@ function splitParagraph(paragraph, maxChars) {
 /**
  * @param {string} content
  * @param {object} settings - { fontSize, lineHeight }
- * @param {{ width: number, height: number } | null} [pageDimensions]
+ * @param {{ width: number, height: number, charWidth?: number } | null} [pageDimensions]
  */
 export function paginateChapter(content, settings, pageDimensions = null) {
   const normalized = content.replace(/\r\n/g, "\n").trim();
@@ -58,8 +58,9 @@ export function paginateChapter(content, settings, pageDimensions = null) {
   let targetChars;
   if (pageDimensions && pageDimensions.width > 50 && pageDimensions.height > 50) {
     const lineHeightPx = settings.fontSize * (settings.lineHeight || 1.8);
-    // CJK full-width chars ≈ fontSize px wide; use 0.9 safety factor
-    const charsPerLine = Math.floor((pageDimensions.width / settings.fontSize) * 0.9);
+    const avgCharWidth = Math.max(8, pageDimensions.charWidth || settings.fontSize);
+    // Keep a small safety margin so browser line-wrap does not overflow page bottom.
+    const charsPerLine = Math.floor((pageDimensions.width / avgCharWidth) * 0.93);
     const linesPerPage = Math.floor(pageDimensions.height / lineHeightPx);
     targetChars = Math.max(200, charsPerLine * linesPerPage);
   } else {
