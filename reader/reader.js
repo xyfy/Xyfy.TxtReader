@@ -414,6 +414,19 @@ function bindEvents() {
       prevPage();
     }
 
+    if (event.key === " ") {
+      event.preventDefault();
+      if (event.shiftKey) {
+        if (state.currentChapterIndex > 0) {
+          goToChapter(state.currentChapterIndex - 1);
+        }
+      } else {
+        if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
+          goToChapter(state.currentChapterIndex + 1);
+        }
+      }
+    }
+
     if (event.key === "[") {
       event.preventDefault();
       if (state.currentChapterIndex > 0) {

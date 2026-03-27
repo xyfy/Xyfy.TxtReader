@@ -12,9 +12,14 @@
   --line-height: 1.8;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.55), transparent 30%),
     linear-gradient(135deg, #d7c7aa, var(--bg-color));
@@ -71,7 +76,8 @@ input:focus-visible {
 .app-shell {
   display: grid;
   grid-template-columns: 320px 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .side-panel {
@@ -79,7 +85,9 @@ input:focus-visible {
   border-right: 1px solid var(--border-color);
   backdrop-filter: blur(12px);
   background: rgba(255, 250, 243, 0.35);
-  overflow: auto;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .panel-block + .panel-block {
@@ -160,6 +168,10 @@ select {
   grid-template-rows: auto 1fr auto;
   gap: 18px;
   padding: 24px;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .reader-header,
@@ -183,11 +195,16 @@ select {
   flex-wrap: wrap;
 }
 
+/* ── 书本双页展开 ── */
 .spread-shell {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  gap: 0;
   min-height: 0;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 22px 50px var(--surface-shadow);
+  overflow: hidden;
 }
 
 .spread-shell.is-single {
@@ -203,23 +220,21 @@ select {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 28px;
   padding: 28px 32px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 12%),
     var(--surface-color);
-  box-shadow: 0 22px 50px var(--surface-shadow);
   overflow: hidden;
 }
 
-.paper-page::after {
-  content: "";
-  position: absolute;
-  inset: 12px;
-  border: 1px solid rgba(110, 78, 44, 0.08);
-  border-radius: 22px;
-  pointer-events: none;
+/* 左页右侧加书脊阴影，模拟装订感 */
+.left-page {
+  border-right: 1.5px solid var(--border-color);
+  box-shadow: inset -8px 0 18px rgba(0, 0, 0, 0.05);
+}
+
+.right-page {
+  box-shadow: inset 8px 0 18px rgba(0, 0, 0, 0.05);
 }
 
 .page-title {
@@ -238,7 +253,9 @@ select {
   white-space: pre-wrap;
   font-size: var(--font-size);
   line-height: var(--line-height);
-  overflow: auto;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
 .page-content.empty {
@@ -317,9 +334,12 @@ select {
 @media (max-width: 1100px) {
   .app-shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
 
   .side-panel {
+    height: auto;
+    max-height: 38vh;
     border-right: 0;
     border-bottom: 1px solid var(--border-color);
   }
