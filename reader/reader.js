@@ -68,6 +68,17 @@ function isScrollMode() {
   return state.settings.readingMode === "scroll";
 }
 
+function updateNavButtonLabels() {
+  if (isScrollMode()) {
+    elements.prevPage.textContent = "上滚";
+    elements.nextPage.textContent = "下滚";
+    return;
+  }
+
+  elements.prevPage.textContent = "上一页";
+  elements.nextPage.textContent = "下一页";
+}
+
 function detectPagesPerView() {
   if (isScrollMode()) {
     state.pagesPerView = 1;
@@ -211,6 +222,7 @@ function applySettings() {
   const disableAnimation = isScrollMode();
   elements.animationStyle.disabled = disableAnimation;
   elements.animationIntensity.disabled = disableAnimation;
+  updateNavButtonLabels();
 }
 
 function updateScrollIndicator() {
@@ -235,6 +247,36 @@ function scrollContentBy(delta, behavior = "auto") {
 function scrollByScreen(direction) {
   const delta = Math.max(120, Math.floor(elements.leftPage.clientHeight * 0.9)) * direction;
   scrollContentBy(delta, "smooth");
+}
+
+function isAtScrollBoundary(direction) {
+  const maxScroll = Math.max(0, elements.leftPage.scrollHeight - elements.leftPage.clientHeight);
+  const top = elements.leftPage.scrollTop;
+  const epsilon = 2;
+
+  if (direction > 0) {
+    return top >= maxScroll - epsilon;
+  }
+
+  return top <= epsilon;
+}
+
+function handleScrollModeSpace(direction) {
+  if (direction > 0 && isAtScrollBoundary(1)) {
+    if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
+      goToChapter(state.currentChapterIndex + 1);
+    }
+    return;
+  }
+
+  if (direction < 0 && isAtScrollBoundary(-1)) {
+    if (state.currentChapterIndex > 0) {
+      goToChapter(state.currentChapterIndex - 1);
+    }
+    return;
+  }
+
+  scrollByScreen(direction);
 }
 
 function scrollByLine(direction) {
@@ -701,7 +743,7 @@ function bindEvents() {
     if (event.key === " ") {
       event.preventDefault();
       if (isScrollMode()) {
-        scrollByScreen(event.shiftKey ? -1 : 1);
+        handleScrollModeSpace(event.shiftKey ? -1 : 1);
       } else {
         if (event.shiftKey) {
           if (state.currentChapterIndex > 0) {
