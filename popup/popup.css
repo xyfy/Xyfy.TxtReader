@@ -1,0 +1,49 @@
+:root {
+  color-scheme: light;
+  font-family: Georgia, "Noto Serif SC", serif;
+  background: radial-gradient(circle at top, #f8edd7, #eadfc7 58%, #dcccae 100%);
+  color: #2e241b;
+}
+
+body {
+  margin: 0;
+  min-width: 280px;
+}
+
+.popup-shell {
+  padding: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7b6447;
+}
+
+h1 {
+  margin: 0 0 10px;
+  font-size: 24px;
+}
+
+.summary {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+button {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 16px;
+  background: #5c3b1f;
+  color: #fff8eb;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #704a29;
+}

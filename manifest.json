@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Xyfy TXT Reader",
+  "version": "0.1.0",
+  "description": "Read local TXT novels with a book-like experience in Chrome and Edge.",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "Xyfy TXT Reader",
+    "default_popup": "popup/popup.html"
+  },
+  "background": {
+    "service_worker": "background/background.js",
+    "type": "module"
+  },
+  "commands": {
+    "open-reader": {
+      "suggested_key": {
+        "default": "Alt+R",
+        "mac": "Command+Shift+R"
+      },
+      "description": "Open the TXT reader"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["reader/*", "modules/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

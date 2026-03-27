@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Xyfy TXT Reader</title>
+    <link rel="stylesheet" href="reader.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="side-panel">
+        <section class="panel-block">
+          <p class="panel-label">导入</p>
+          <label class="file-picker">
+            <input id="file-input" type="file" accept=".txt,text/plain" />
+            <span>选择本地 TXT</span>
+          </label>
+          <p id="file-meta" class="file-meta">尚未导入文件</p>
+        </section>
+
+        <section class="panel-block">
+          <p class="panel-label">书架</p>
+          <select id="library-select"></select>
+        </section>
+
+        <section class="panel-block">
+          <div class="section-head">
+            <p class="panel-label">目录</p>
+            <span id="chapter-count" class="counter">0</span>
+          </div>
+          <div id="toc-list" class="list"></div>
+        </section>
+
+        <section class="panel-block">
+          <div class="section-head">
+            <p class="panel-label">书签</p>
+            <button id="bookmark-button" class="small-button" type="button">添加</button>
+          </div>
+          <div id="bookmark-list" class="list"></div>
+        </section>
+      </aside>
+
+      <main class="reader-shell">
+        <header class="reader-header">
+          <div>
+            <p class="eyebrow">Book View</p>
+            <h1 id="book-title">Xyfy TXT Reader</h1>
+          </div>
+          <div class="header-actions">
+            <button id="prev-chapter" type="button">上一章</button>
+            <button id="next-chapter" type="button">下一章</button>
+          </div>
+        </header>
+
+        <section class="spread-shell">
+          <article class="paper-page left-page">
+            <p id="left-title" class="page-title"></p>
+            <div id="left-page" class="page-content empty">导入 TXT 后开始阅读</div>
+          </article>
+          <article class="paper-page right-page">
+            <p id="right-title" class="page-title"></p>
+            <div id="right-page" class="page-content empty">支持目录、书签、设置与快捷键</div>
+          </article>
+        </section>
+
+        <footer class="reader-footer">
+          <div class="nav-group">
+            <button id="prev-page" type="button">上一页</button>
+            <span id="page-indicator">0 / 0</span>
+            <button id="next-page" type="button">下一页</button>
+          </div>
+          <div class="nav-group">
+            <label>
+              背景
+              <select id="theme-select">
+                <option value="paper">纸张</option>
+                <option value="sepia">护眼</option>
+                <option value="night">夜间</option>
+              </select>
+            </label>
+            <label>
+              字体
+              <select id="font-select">
+                <option value='"Noto Serif SC", Georgia, serif'>衬线</option>
+                <option value='"PingFang SC", "Microsoft YaHei", sans-serif'>黑体</option>
+                <option value='"LXGW WenKai", "Kaiti SC", serif'>楷体</option>
+              </select>
+            </label>
+            <label>
+              字号
+              <input id="font-size" type="range" min="14" max="28" step="1" />
+            </label>
+          </div>
+        </footer>
+      </main>
+    </div>
+    <script type="module" src="reader.js"></script>
+  </body>
+</html>
