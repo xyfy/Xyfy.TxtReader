@@ -61,6 +61,8 @@ const elements = {
   readerShell: document.querySelector(".reader-shell")
 };
 
+let resizeTimer = null;
+
 function detectPagesPerView() {
   const isMobile = window.matchMedia("(max-width: 820px)").matches;
   state.pagesPerView = isMobile ? 1 : 2;
@@ -559,11 +561,17 @@ function bindEvents() {
   elements.animationIntensity.addEventListener("input", handleSettingsChange);
 
   window.addEventListener("resize", () => {
-    detectPagesPerView();
-    if (state.currentPageIndex % state.pagesPerView !== 0) {
-      state.currentPageIndex -= state.currentPageIndex % state.pagesPerView;
+    if (resizeTimer) {
+      clearTimeout(resizeTimer);
     }
-    rebuildPages();
+
+    resizeTimer = setTimeout(() => {
+      detectPagesPerView();
+      if (state.currentPageIndex % state.pagesPerView !== 0) {
+        state.currentPageIndex -= state.currentPageIndex % state.pagesPerView;
+      }
+      rebuildPages();
+    }, 120);
   });
 
   document.addEventListener("keydown", (event) => {

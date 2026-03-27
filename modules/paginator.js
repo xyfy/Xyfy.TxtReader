@@ -135,14 +135,26 @@ function paginateByRenderedHeight(normalized, settings, pageDimensions, fitsPage
   let rest = normalized;
 
   while (rest.length) {
-    if (fitsPage(rest)) {
+    const fitCache = new Map();
+    const fitsPrefix = (length) => {
+      const safeLength = Math.max(0, Math.min(rest.length, length));
+      if (fitCache.has(safeLength)) {
+        return fitCache.get(safeLength);
+      }
+
+      const ok = fitsPage(rest.slice(0, safeLength));
+      fitCache.set(safeLength, ok);
+      return ok;
+    };
+
+    if (fitsPrefix(rest.length)) {
       pages.push(rest);
       break;
     }
 
     let low = 1;
     let high = Math.min(rest.length, Math.max(300, estimatedTarget));
-    while (high < rest.length && fitsPage(rest.slice(0, high))) {
+    while (high < rest.length && fitsPrefix(high)) {
       const next = Math.min(rest.length, Math.floor(high * 1.35));
       if (next === high) {
         break;
@@ -152,7 +164,7 @@ function paginateByRenderedHeight(normalized, settings, pageDimensions, fitsPage
 
     while (low < high) {
       const mid = Math.ceil((low + high) / 2);
-      if (fitsPage(rest.slice(0, mid))) {
+      if (fitsPrefix(mid)) {
         low = mid;
       } else {
         high = mid - 1;
