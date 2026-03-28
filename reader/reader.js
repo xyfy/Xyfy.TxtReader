@@ -90,9 +90,14 @@ const elements = {
   fontSize: document.getElementById("font-size"),
   animationStyle: document.getElementById("animation-style"),
   animationIntensity: document.getElementById("animation-intensity"),
+  showStats: document.getElementById("show-stats"),
   languageSelect: document.getElementById("language-select"),
   spreadShell: document.querySelector(".spread-shell"),
   appShell: document.querySelector(".app-shell"),
+  settingsToggle: document.getElementById("settings-toggle"),
+  settingsOverlay: document.getElementById("settings-overlay"),
+  settingsClose: document.getElementById("settings-close"),
+  statsSection: document.getElementById("stats-section"),
   togglePanel: document.getElementById("toggle-panel"),
   immersiveToggle: document.getElementById("immersive-toggle"),
   immersiveExit: document.getElementById("immersive-exit"),
@@ -110,6 +115,7 @@ let resizeTimer = null;
 let modeHintTimer = null;
 let warmupTimer = null;
 let shortcutsOpen = false;
+let settingsOpen = false;
 
 function requestWarmupWork(callback) {
   if (typeof window.requestIdleCallback === "function") {
@@ -753,6 +759,11 @@ async function refreshRecentReads() {
 }
 
 function renderStats() {
+  if (!state.settings.showStats) {
+    elements.statsList.innerHTML = "";
+    return;
+  }
+
   const stats = [];
   const chapter = state.book?.chapters?.[state.currentChapterIndex];
   const chapterCount = state.book?.chapters?.length || 0;
@@ -789,6 +800,11 @@ function renderStats() {
 function setShortcutsOverlay(open) {
   shortcutsOpen = open;
   elements.shortcutsOverlay.classList.toggle("hidden", !open);
+}
+
+function setSettingsOverlay(open) {
+  settingsOpen = open;
+  elements.settingsOverlay?.classList.toggle("hidden", !open);
 }
 
 function renderLibrary() {
@@ -879,6 +895,10 @@ function applySettings() {
   elements.fontSize.value = String(state.settings.fontSize);
   elements.animationStyle.value = state.settings.animationStyle || "slide";
   elements.animationIntensity.value = String(state.settings.animationIntensity || 2);
+  if (elements.showStats) {
+    elements.showStats.checked = Boolean(state.settings.showStats);
+  }
+  elements.statsSection?.classList.toggle("hidden", !state.settings.showStats);
   const disableAnimation = isScrollMode();
   elements.animationStyle.disabled = disableAnimation;
   elements.animationIntensity.disabled = disableAnimation;
@@ -1413,7 +1433,8 @@ async function handleSettingsChange() {
     fontSize: Number(elements.fontSize.value),
     lineHeight: state.settings.lineHeight,
     animationStyle: elements.animationStyle.value,
-    animationIntensity: Number(elements.animationIntensity.value)
+    animationIntensity: Number(elements.animationIntensity.value),
+    showStats: Boolean(elements.showStats?.checked)
   };
   applySettings();
   detectPagesPerView();
@@ -1499,6 +1520,17 @@ function bindEvents() {
   elements.shortcutsToggle.addEventListener("click", () => {
     setShortcutsOverlay(true);
   });
+  elements.settingsToggle?.addEventListener("click", () => {
+    setSettingsOverlay(true);
+  });
+  elements.settingsClose?.addEventListener("click", () => {
+    setSettingsOverlay(false);
+  });
+  elements.settingsOverlay?.addEventListener("click", (event) => {
+    if (event.target === elements.settingsOverlay) {
+      setSettingsOverlay(false);
+    }
+  });
   elements.shortcutsClose.addEventListener("click", () => {
     setShortcutsOverlay(false);
   });
@@ -1514,6 +1546,7 @@ function bindEvents() {
   elements.fontSize.addEventListener("input", handleSettingsChange);
   elements.animationStyle.addEventListener("change", handleSettingsChange);
   elements.animationIntensity.addEventListener("input", handleSettingsChange);
+  elements.showStats?.addEventListener("change", handleSettingsChange);
   elements.leftPage.addEventListener("scroll", () => {
     if (isScrollMode()) {
       updateScrollIndicator();
@@ -1543,6 +1576,12 @@ function bindEvents() {
     if (event.key === "Escape" && shortcutsOpen) {
       event.preventDefault();
       setShortcutsOverlay(false);
+      return;
+    }
+
+    if (event.key === "Escape" && settingsOpen) {
+      event.preventDefault();
+      setSettingsOverlay(false);
       return;
     }
 
