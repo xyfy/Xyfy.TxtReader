@@ -1,7 +1,7 @@
 const LOCALE_ZH = "zh_CN";
 const LOCALE_EN = "en";
 
-const MESSAGES = {
+export const MESSAGES = {
   en: {
     extName: "Xyfy TXT Reader",
     popupEyebrow: "TXT Reader",
@@ -55,9 +55,9 @@ const MESSAGES = {
     readerIntensityLabel: "Intensity",
     readerImmersiveEnter: "Enter immersive mode",
     readerImmersiveExit: "Exit immersive mode",
-    readerShortcutsDescArrows: "Turn pages; keep pressing at the boundary to switch chapters",
-    readerShortcutsDescSpace: "Next chapter in book mode; scroll one screen in scrolling mode",
-    readerShortcutsDescShiftSpace: "Scroll one screen up or go to previous chapter in scrolling mode",
+    readerShortcutsDescArrows: "Switch chapters",
+    readerShortcutsDescSpace: "Next page (or next chapter at page boundary)",
+    readerShortcutsDescShiftSpace: "Previous page (or previous chapter at page boundary)",
     readerShortcutsDescVertical: "Scroll by small steps in scrolling mode",
     readerShortcutsDescBookmark: "Add a bookmark for the current location",
     readerShortcutsDescSidebar: "Show or hide the sidebar",
@@ -80,8 +80,8 @@ const MESSAGES = {
     readerLibraryItem: "{name} · {count} chapters",
     readerBookmarksEmpty: "No bookmarks for this book yet",
     readerDelete: "Delete",
-    readerHintBottomNextChapter: "At the end. Press Right Arrow or Space to move to the next chapter.",
-    readerHintTopPrevChapter: "At the top. Press Left Arrow or Shift+Space to return to the previous chapter.",
+    readerHintBottomNextChapter: "At the end. Press Space to move to the next chapter.",
+    readerHintTopPrevChapter: "At the top. Press Shift+Space to return to the previous chapter.",
     readerHintNextChapter: "Switched to next chapter",
     readerHintPrevChapter: "Switched to previous chapter",
     readerCurrentPageEmpty: "This page is empty",
@@ -89,11 +89,22 @@ const MESSAGES = {
     readerBackupExported: "Exported {books} books, {progress} progress items, and {bookmarks} bookmarks",
     readerBackupImported: "Restored {books} books, {progress} progress items, and {bookmarks} bookmarks",
     readerBackupImportFailed: "Failed to restore backup",
+    readerResetTitle: "Reset data",
+    readerResetTargetSettings: "Reading settings",
+    readerResetTargetProgress: "Reading progress",
+    readerResetTargetBookmarks: "Bookmarks",
+    readerResetTargetBooks: "Imported books",
+    readerResetAction: "Reset selected items",
+    readerResetConfirm: "Confirm reset for: {targets}? This cannot be undone.",
+    readerResetNothingSelected: "Select at least one reset target",
+    readerResetDone: "Reset completed: {targets}",
+    readerResetFailed: "Failed to reset selected data",
+    readerSyncFallbackLocalOnly: "{provider} sync is unavailable. Using local storage only.",
     readerBookmarkLabel: "{chapter} · Page group {page}",
     readerInitFailed: "Initialization failed. Check the console for details."
   },
   zh_CN: {
-    extName: "Xyfy TXT Reader",
+    extName: "文本阅读器",
     popupEyebrow: "TXT Reader",
     popupHeading: "打开阅读器",
     popupSummary: "导入本地 TXT 后即可继续阅读，并支持分页、备份和同步。",
@@ -145,9 +156,9 @@ const MESSAGES = {
     readerIntensityLabel: "强度",
     readerImmersiveEnter: "进入沉浸模式",
     readerImmersiveExit: "退出沉浸模式",
-    readerShortcutsDescArrows: "翻页；在边界继续按则切换章节",
-    readerShortcutsDescSpace: "书本模式切下一章；滚动模式下滚一屏",
-    readerShortcutsDescShiftSpace: "滚动模式上滚一屏或回上一章",
+    readerShortcutsDescArrows: "切换章节",
+    readerShortcutsDescSpace: "下一页（页末自动切到下一章）",
+    readerShortcutsDescShiftSpace: "上一页（页首自动回到上一章）",
     readerShortcutsDescVertical: "单页滚动模式下小步滚动",
     readerShortcutsDescBookmark: "添加当前书签",
     readerShortcutsDescSidebar: "显示/隐藏左侧栏",
@@ -170,8 +181,8 @@ const MESSAGES = {
     readerLibraryItem: "{name} · {count}章",
     readerBookmarksEmpty: "当前书籍还没有书签",
     readerDelete: "删除",
-    readerHintBottomNextChapter: "已到底，按右方向键或空格切下一章",
-    readerHintTopPrevChapter: "已到顶，按左方向键或 Shift+空格回上一章",
+    readerHintBottomNextChapter: "已到底，按空格切下一章",
+    readerHintTopPrevChapter: "已到顶，按 Shift+空格回上一章",
     readerHintNextChapter: "切换到下一章",
     readerHintPrevChapter: "切换到上一章",
     readerCurrentPageEmpty: "当前页没有内容",
@@ -179,13 +190,24 @@ const MESSAGES = {
     readerBackupExported: "已导出 {books} 本书、{progress} 条进度、{bookmarks} 个书签",
     readerBackupImported: "已恢复 {books} 本书、{progress} 条进度、{bookmarks} 个书签",
     readerBackupImportFailed: "恢复备份失败",
+    readerResetTitle: "重置数据",
+    readerResetTargetSettings: "阅读设置",
+    readerResetTargetProgress: "阅读进度",
+    readerResetTargetBookmarks: "书签",
+    readerResetTargetBooks: "已导入书籍",
+    readerResetAction: "重置已选项",
+    readerResetConfirm: "确认重置：{targets}？该操作不可撤销。",
+    readerResetNothingSelected: "请至少选择一个重置项",
+    readerResetDone: "重置完成：{targets}",
+    readerResetFailed: "重置失败",
+    readerSyncFallbackLocalOnly: "{provider} 同步不可用，已仅使用本地存储。",
     readerBookmarkLabel: "{chapter} · 第 {page} 页组",
     readerInitFailed: "初始化失败，请查看控制台错误。"
   }
 };
 
 function resolveLocale() {
-  const uiLanguage = chrome?.i18n?.getUILanguage?.() || navigator.language || LOCALE_EN;
+  const uiLanguage = globalThis.chrome?.i18n?.getUILanguage?.() || globalThis.navigator?.language || LOCALE_EN;
   return uiLanguage.toLowerCase().startsWith("zh") ? LOCALE_ZH : LOCALE_EN;
 }
 

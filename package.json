@@ -6,17 +6,16 @@
   "scripts": {
     "build:zip": "rm -f dist/xyfy-txt-reader-v$npm_package_version.zip && mkdir -p dist && zip -r dist/xyfy-txt-reader-v$npm_package_version.zip manifest.json _locales background modules popup reader icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png",
     "gen:icons": "node scripts/gen-icons.mjs",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "test": "npm run test:paginator && npm run test:backup && npm run test:storage-sync",
+    "test": "npm run test:paginator && npm run test:backup && npm run test:storage-sync && npm run test:i18n && npm run test:storage-reset && npm run test:keyboard-map",
     "test:paginator": "node tests/paginator.test.mjs",
     "test:backup": "node tests/backup.test.mjs",
-    "test:storage-sync": "node tests/storage-sync.test.mjs"
+    "test:storage-sync": "node tests/storage-sync.test.mjs",
+    "test:i18n": "node tests/i18n.test.mjs",
+    "test:storage-reset": "node tests/storage-reset.test.mjs",
+    "test:keyboard-map": "node tests/keyboard-map.test.mjs"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
-    "eslint": "^9.39.4",
-    "globals": "^17.4.0",
+    "fake-indexeddb": "^6.2.5",
     "sharp": "^0.34.5"
   }
 }
