@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
+  "default_locale": "zh_CN",
   "name": "Xyfy TXT Reader",
   "version": "0.2.0",
   "description": "Local TXT novel reader for Chrome and Edge with book mode, scroll mode, immersive reading, backup, and sync.",
   "permissions": ["storage", "identity"],
   "host_permissions": ["https://www.googleapis.com/*"],
   "oauth2": {
-    "client_id": "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "client_id": "616148876420-lmi1ol0602t9pnco4iissf4movbecgq5.apps.googleusercontent.com",
     "scopes": ["https://www.googleapis.com/auth/drive.appdata"]
   },
   "icons": {
