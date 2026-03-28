@@ -97,6 +97,14 @@ class MockCloudProvider extends CloudProvider {
 CloudProviderFactory.register('mock', MockCloudProvider);
 console.assert(CloudProviderFactory.listProviders().length > 0, 'Factory should have registered provider');
 
+try {
+  class InvalidProvider {}
+  CloudProviderFactory.register('invalid', InvalidProvider);
+  console.assert(false, 'Factory should reject class that does not extend CloudProvider');
+} catch (err) {
+  console.assert(err instanceof Error, 'Should throw error for invalid provider class');
+}
+
 const mockProvider = CloudProviderFactory.create('mock');
 console.assert(mockProvider instanceof CloudProvider, 'Factory should create provider instance');
 

@@ -159,7 +159,7 @@ export class CloudProviderFactory {
    * @param {typeof CloudProvider} ProviderClass - Provider class extending CloudProvider
    */
   static register(providerId, ProviderClass) {
-    if (!ProviderClass.prototype instanceof CloudProvider) {
+    if (!(ProviderClass.prototype instanceof CloudProvider)) {
       throw new Error(`${ProviderClass.name} must extend CloudProvider`);
     }
     this.providers.set(providerId, ProviderClass);

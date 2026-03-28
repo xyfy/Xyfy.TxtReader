@@ -4,6 +4,7 @@ import { parseChapters } from "../modules/chapter-parser.js";
 import { createRenderedChapterPager, paginateChapter } from "../modules/paginator.js";
 import { CloudStorage } from "../modules/cloud-storage.js";
 import { NoOpCloudProvider } from "../modules/cloud-provider.js";
+import { GoogleDriveProvider } from "../modules/google-drive-provider.js";
 import {
   deleteBookmark,
   exportBackupSnapshot,
@@ -381,6 +382,78 @@ function formatCloudTime(isoString) {
   return date.toLocaleString("zh-CN", { hour12: false });
 }
 
+async function handleCloudRestore(fileId) {
+  if (!fileId || !state.cloudProvider || state.cloudOperationInProgress) {
+    return;
+  }
+
+  setCloudActionBusy(true);
+  setCloudStatus("正在从云端恢复备份...", "connected");
+
+  try {
+    const restoreResult = await state.cloudProvider.restoreFromCloud(fileId);
+    if (!restoreResult.success) {
+      throw restoreResult.error || new Error("云端恢复失败");
+    }
+
+    const payload = parseBackupPayload(JSON.stringify(restoreResult.data));
+    const importResult = await importBackupSnapshot(payload);
+
+    state.chapterPageCache.clear();
+    state.settings = await getReaderSettings();
+    applySettings();
+    detectPagesPerView();
+    state.books = await listBooks();
+    renderLibrary();
+    await refreshRecentReads();
+
+    const preferredBookId = state.book?.id || payload.books[0]?.id || state.books[0]?.id;
+    if (preferredBookId) {
+      await loadBook(preferredBookId);
+    } else {
+      renderBookmarks();
+      renderToc();
+      renderSpread();
+    }
+
+    setCloudStatus(
+      `恢复完成：${importResult.booksImported} 本书、${importResult.progressImported} 条进度、${importResult.bookmarksImported} 个书签`,
+      "connected"
+    );
+  } catch (error) {
+    setCloudStatus(error instanceof Error ? error.message : "云端恢复失败", "error", true);
+  } finally {
+    setCloudActionBusy(false);
+  }
+}
+
+async function handleCloudDelete(fileId) {
+  if (!fileId || !state.cloudProvider || state.cloudOperationInProgress) {
+    return;
+  }
+
+  const confirmed = window.confirm("确认删除这条云备份吗？此操作不可撤销。");
+  if (!confirmed) {
+    return;
+  }
+
+  setCloudActionBusy(true);
+  setCloudStatus("正在删除云端备份...", "connected");
+
+  try {
+    const result = await state.cloudProvider.deleteCloudBackup(fileId);
+    if (!result.success) {
+      throw result.error || new Error("删除失败");
+    }
+    setCloudStatus("云端备份已删除", "connected");
+    await refreshCloudBackups();
+  } catch (error) {
+    setCloudStatus(error instanceof Error ? error.message : "删除失败", "error", true);
+  } finally {
+    setCloudActionBusy(false);
+  }
+}
+
 function renderCloudBackups(backups) {
   elements.cloudBackupsList.innerHTML = "";
   if (!Array.isArray(backups) || backups.length === 0) {
@@ -415,14 +488,14 @@ function renderCloudBackups(backups) {
     restoreButton.type = "button";
     restoreButton.textContent = "恢复";
     restoreButton.addEventListener("click", () => {
-      setCloudStatus("云端恢复入口已预留（下一阶段接入）", "needs-auth");
+      handleCloudRestore(backup.fileId);
     });
 
     const removeButton = document.createElement("button");
     removeButton.type = "button";
     removeButton.textContent = "删除";
     removeButton.addEventListener("click", () => {
-      setCloudStatus("云端删除入口已预留（下一阶段接入）", "needs-auth");
+      handleCloudDelete(backup.fileId);
     });
 
     actions.append(restoreButton, removeButton);
@@ -462,8 +535,9 @@ function setCloudActionBusy(isBusy) {
 }
 
 async function initializeCloudSection() {
+  const hasIdentityApi = Boolean(globalThis.chrome?.identity?.getAuthToken);
   state.cloudProvider = new CloudStorage({
-    provider: new NoOpCloudProvider()
+    provider: hasIdentityApi ? new GoogleDriveProvider() : new NoOpCloudProvider()
   });
 
   const initResult = await state.cloudProvider.initialize();
@@ -477,11 +551,16 @@ async function initializeCloudSection() {
   state.cloudAuthed = ready;
 
   if (ready) {
-    setCloudStatus("已连接云服务", "connected");
+    setCloudStatus("已连接 Google Drive", "connected");
     elements.cloudBackupsContainer.classList.remove("hidden");
     await refreshCloudBackups();
   } else {
-    setCloudStatus("未连接云服务（当前为占位 Provider）", "needs-auth");
+    const metadata = state.cloudProvider.getProviderMetadata();
+    if (metadata.providerId === "google-drive") {
+      setCloudStatus("未连接 Google Drive，点击“连接云服务”完成授权", "needs-auth");
+    } else {
+      setCloudStatus("当前环境不支持身份授权，已回退到本地备份", "error", true);
+    }
     elements.cloudBackupsContainer.classList.add("hidden");
   }
 
@@ -494,13 +573,13 @@ async function handleCloudConnect() {
   }
 
   setCloudActionBusy(true);
-  setCloudStatus("正在连接云服务...", "needs-auth");
+  setCloudStatus("正在连接 Google Drive...", "needs-auth");
 
   try {
     const result = await state.cloudProvider.requestCloudAuth();
     if (result.success) {
       state.cloudAuthed = true;
-      setCloudStatus("云服务连接成功", "connected");
+      setCloudStatus("Google Drive 连接成功", "connected");
       elements.cloudBackupsContainer.classList.remove("hidden");
       await refreshCloudBackups();
     } else {
