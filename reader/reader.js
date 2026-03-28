@@ -3,8 +3,7 @@ import { createBackupFilename, createBackupPayload, parseBackupPayload } from ".
 import { parseChapters } from "../modules/chapter-parser.js";
 import { createRenderedChapterPager, paginateChapter } from "../modules/paginator.js";
 import { CloudStorage } from "../modules/cloud-storage.js";
-import { NoOpCloudProvider } from "../modules/cloud-provider.js";
-import { GoogleDriveProvider } from "../modules/google-drive-provider.js";
+import { GistProvider } from "../modules/gist-provider.js";
 import {
   deleteBookmark,
   exportBackupSnapshot,
@@ -38,6 +37,11 @@ const state = {
   currentChapterIndex: 0,
   currentPageIndex: 0,
   cloudProvider: null,
+  cloudProviderName: "GitHub Gist",
+  cloudConfig: {
+    gistId: "",
+    token: ""
+  },
   cloudAuthed: false,
   cloudOperationInProgress: false
 };
@@ -50,6 +54,8 @@ const elements = {
   exportBackup: document.getElementById("export-backup"),
   importBackup: document.getElementById("import-backup"),
   backupStatus: document.getElementById("backup-status"),
+  cloudGistId: document.getElementById("cloud-gist-id"),
+  cloudGistToken: document.getElementById("cloud-gist-token"),
   cloudConnect: document.getElementById("cloud-connect"),
   cloudSync: document.getElementById("cloud-sync"),
   cloudStatus: document.getElementById("cloud-status"),
@@ -371,6 +377,36 @@ function setCloudStatus(message, status = "idle", isError = false) {
   elements.cloudStatusBadge.title = message;
 }
 
+const GIST_CONFIG_KEY = "gistCloudConfig";
+
+function loadGistConfig() {
+  return new Promise((resolve) => {
+    if (!globalThis.chrome?.storage?.local) {
+      resolve({ gistId: "", token: "" });
+      return;
+    }
+
+    chrome.storage.local.get([GIST_CONFIG_KEY], (result) => {
+      const config = result[GIST_CONFIG_KEY] || {};
+      resolve({
+        gistId: typeof config.gistId === "string" ? config.gistId : "",
+        token: typeof config.token === "string" ? config.token : ""
+      });
+    });
+  });
+}
+
+function saveGistConfig(config) {
+  return new Promise((resolve) => {
+    if (!globalThis.chrome?.storage?.local) {
+      resolve();
+      return;
+    }
+
+    chrome.storage.local.set({ [GIST_CONFIG_KEY]: config }, () => resolve());
+  });
+}
+
 function formatCloudTime(isoString) {
   if (!isoString) {
     return "未知时间";
@@ -535,14 +571,25 @@ function setCloudActionBusy(isBusy) {
 }
 
 async function initializeCloudSection() {
-  const hasIdentityApi = Boolean(globalThis.chrome?.identity?.getAuthToken);
+  state.cloudConfig = await loadGistConfig();
+  if (elements.cloudGistId) {
+    elements.cloudGistId.value = state.cloudConfig.gistId;
+  }
+  if (elements.cloudGistToken) {
+    elements.cloudGistToken.value = state.cloudConfig.token;
+  }
+
+  const provider = new GistProvider(state.cloudConfig);
+  const providerMeta = provider.getMetadata();
+  state.cloudProviderName = providerMeta.name || "云服务";
+
   state.cloudProvider = new CloudStorage({
-    provider: hasIdentityApi ? new GoogleDriveProvider() : new NoOpCloudProvider()
+    provider
   });
 
   const initResult = await state.cloudProvider.initialize();
   if (!initResult.success) {
-    setCloudStatus("云服务初始化失败", "error", true);
+    setCloudStatus(`${state.cloudProviderName} 初始化失败`, "error", true);
     setCloudActionBusy(false);
     return;
   }
@@ -551,16 +598,11 @@ async function initializeCloudSection() {
   state.cloudAuthed = ready;
 
   if (ready) {
-    setCloudStatus("已连接 Google Drive（使用你的云盘空间）", "connected");
+    setCloudStatus(`已连接 ${state.cloudProviderName}（使用你的 Gist 存储）`, "connected");
     elements.cloudBackupsContainer.classList.remove("hidden");
     await refreshCloudBackups();
   } else {
-    const metadata = state.cloudProvider.getProviderMetadata();
-    if (metadata.providerId === "google-drive") {
-      setCloudStatus("未连接 Google Drive，授权后备份会保存到你的云盘空间", "needs-auth");
-    } else {
-      setCloudStatus("当前环境不支持身份授权，已回退到本地备份", "error", true);
-    }
+    setCloudStatus("请填写 Gist ID 和 Token，再点击“连接 Gist”", "needs-auth");
     elements.cloudBackupsContainer.classList.add("hidden");
   }
 
@@ -568,18 +610,27 @@ async function initializeCloudSection() {
 }
 
 async function handleCloudConnect() {
-  if (!state.cloudProvider || state.cloudOperationInProgress) {
+  if (!state.cloudProvider || state.cloudOperationInProgress || elements.cloudConnect.disabled) {
     return;
   }
 
   setCloudActionBusy(true);
-  setCloudStatus("正在连接 Google Drive...", "needs-auth");
+  setCloudStatus(`正在连接 ${state.cloudProviderName}...`, "needs-auth");
 
   try {
-    const result = await state.cloudProvider.requestCloudAuth();
+    const gistId = elements.cloudGistId?.value?.trim() || "";
+    const token = elements.cloudGistToken?.value?.trim() || "";
+
+    if (!gistId || !token) {
+      throw new Error("请填写 Gist ID 和 Token");
+    }
+
+    const result = await state.cloudProvider.requestCloudAuth({ gistId, token });
     if (result.success) {
       state.cloudAuthed = true;
-      setCloudStatus("Google Drive 连接成功，备份将写入你的云盘空间", "connected");
+      state.cloudConfig = { gistId, token };
+      await saveGistConfig(state.cloudConfig);
+      setCloudStatus(`${state.cloudProviderName} 连接成功，备份将写入你的 Gist`, "connected");
       elements.cloudBackupsContainer.classList.remove("hidden");
       await refreshCloudBackups();
     } else {

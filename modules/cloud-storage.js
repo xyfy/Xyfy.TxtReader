@@ -265,12 +265,13 @@ export class CloudStorage {
 
   /**
    * Request cloud provider authentication
+   * @param {Object} options - Provider-specific auth options
    * @returns {Promise<CloudOperationResult>}
    */
-  async requestCloudAuth() {
+  async requestCloudAuth(options = {}) {
     const startTime = Date.now();
     try {
-      const authResult = await this.provider.requestAuth();
+      const authResult = await this.provider.requestAuth(options);
       this.logOperation('requestCloudAuth', true, null);
 
       return new CloudOperationResult(true, authResult, null, {
