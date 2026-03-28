@@ -1331,10 +1331,14 @@ async function bootstrap() {
   applyI18n();
   const syncSupport = getSyncSupportInfo();
   if (!syncSupport.syncAvailable) {
+    const providerDisplayNames = {
+      chrome: "Chrome",
+      edge: "Microsoft Edge"
+    };
+    const providerName = providerDisplayNames[syncSupport.provider];
+    const params = providerName ? { provider: providerName } : {};
     setBackupStatus(
-      t("readerSyncFallbackLocalOnly", {
-        provider: syncSupport.provider
-      })
+      t("readerSyncFallbackLocalOnly", params)
     );
   }
   state.settings = await getReaderSettings();
