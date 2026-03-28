@@ -551,13 +551,13 @@ async function initializeCloudSection() {
   state.cloudAuthed = ready;
 
   if (ready) {
-    setCloudStatus("已连接 Google Drive", "connected");
+    setCloudStatus("已连接 Google Drive（使用你的云盘空间）", "connected");
     elements.cloudBackupsContainer.classList.remove("hidden");
     await refreshCloudBackups();
   } else {
     const metadata = state.cloudProvider.getProviderMetadata();
     if (metadata.providerId === "google-drive") {
-      setCloudStatus("未连接 Google Drive，点击“连接云服务”完成授权", "needs-auth");
+      setCloudStatus("未连接 Google Drive，授权后备份会保存到你的云盘空间", "needs-auth");
     } else {
       setCloudStatus("当前环境不支持身份授权，已回退到本地备份", "error", true);
     }
@@ -579,7 +579,7 @@ async function handleCloudConnect() {
     const result = await state.cloudProvider.requestCloudAuth();
     if (result.success) {
       state.cloudAuthed = true;
-      setCloudStatus("Google Drive 连接成功", "connected");
+      setCloudStatus("Google Drive 连接成功，备份将写入你的云盘空间", "connected");
       elements.cloudBackupsContainer.classList.remove("hidden");
       await refreshCloudBackups();
     } else {
