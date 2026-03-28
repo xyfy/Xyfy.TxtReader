@@ -2,6 +2,8 @@ import { readTxtFile } from "../modules/file-handler.js";
 import { createBackupFilename, createBackupPayload, parseBackupPayload } from "../modules/backup.js";
 import { parseChapters } from "../modules/chapter-parser.js";
 import { createRenderedChapterPager, paginateChapter } from "../modules/paginator.js";
+import { CloudStorage } from "../modules/cloud-storage.js";
+import { NoOpCloudProvider } from "../modules/cloud-provider.js";
 import {
   deleteBookmark,
   exportBackupSnapshot,
@@ -33,7 +35,10 @@ const state = {
   lastPageDimensions: null,
   pagesPerView: 2,
   currentChapterIndex: 0,
-  currentPageIndex: 0
+  currentPageIndex: 0,
+  cloudProvider: null,
+  cloudAuthed: false,
+  cloudOperationInProgress: false
 };
 
 const PAGE_CACHE_LIMIT = 8;
@@ -44,6 +49,13 @@ const elements = {
   exportBackup: document.getElementById("export-backup"),
   importBackup: document.getElementById("import-backup"),
   backupStatus: document.getElementById("backup-status"),
+  cloudConnect: document.getElementById("cloud-connect"),
+  cloudSync: document.getElementById("cloud-sync"),
+  cloudStatus: document.getElementById("cloud-status"),
+  cloudStatusBadge: document.getElementById("cloud-status-badge"),
+  cloudBackupsContainer: document.getElementById("cloud-backups-container"),
+  cloudBackupsList: document.getElementById("cloud-backups-list"),
+  cloudQuota: document.getElementById("cloud-quota"),
   librarySelect: document.getElementById("library-select"),
   recentList: document.getElementById("recent-list"),
   statsList: document.getElementById("stats-list"),
@@ -349,6 +361,189 @@ function schedulePaginationWarmup() {
 function setBackupStatus(message, isError = false) {
   elements.backupStatus.textContent = message;
   elements.backupStatus.style.color = isError ? "#b5442a" : "";
+}
+
+function setCloudStatus(message, status = "idle", isError = false) {
+  elements.cloudStatus.textContent = message;
+  elements.cloudStatus.style.color = isError ? "#b5442a" : "";
+  elements.cloudStatusBadge.dataset.status = status;
+  elements.cloudStatusBadge.title = message;
+}
+
+function formatCloudTime(isoString) {
+  if (!isoString) {
+    return "未知时间";
+  }
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return "未知时间";
+  }
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function renderCloudBackups(backups) {
+  elements.cloudBackupsList.innerHTML = "";
+  if (!Array.isArray(backups) || backups.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "file-meta";
+    empty.textContent = "暂无云端备份";
+    elements.cloudBackupsList.append(empty);
+    return;
+  }
+
+  for (const backup of backups) {
+    const row = document.createElement("div");
+    row.className = "list-item";
+
+    const info = document.createElement("div");
+    info.className = "backup-info";
+
+    const name = document.createElement("div");
+    name.className = "backup-name";
+    name.textContent = backup.fileName || "未命名备份";
+
+    const time = document.createElement("div");
+    time.className = "backup-time";
+    time.textContent = `${formatCloudTime(backup.uploadedAt)} · ${formatSize(Number(backup.size || 0))}`;
+
+    info.append(name, time);
+
+    const actions = document.createElement("div");
+    actions.className = "backup-actions";
+
+    const restoreButton = document.createElement("button");
+    restoreButton.type = "button";
+    restoreButton.textContent = "恢复";
+    restoreButton.addEventListener("click", () => {
+      setCloudStatus("云端恢复入口已预留（下一阶段接入）", "needs-auth");
+    });
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.textContent = "删除";
+    removeButton.addEventListener("click", () => {
+      setCloudStatus("云端删除入口已预留（下一阶段接入）", "needs-auth");
+    });
+
+    actions.append(restoreButton, removeButton);
+    row.append(info, actions);
+    elements.cloudBackupsList.append(row);
+  }
+}
+
+async function refreshCloudBackups() {
+  if (!state.cloudProvider) {
+    return;
+  }
+
+  const [listResult, quotaResult] = await Promise.all([
+    state.cloudProvider.listCloudBackups({ limit: 20 }),
+    state.cloudProvider.getCloudQuota()
+  ]);
+
+  if (listResult.success) {
+    renderCloudBackups(listResult.data);
+  } else {
+    renderCloudBackups([]);
+  }
+
+  if (quotaResult.success && quotaResult.data) {
+    const quota = quotaResult.data;
+    elements.cloudQuota.textContent = `云空间：${formatSize(Number(quota.usedBytes || 0))} / ${formatSize(Number(quota.totalBytes || 0))}`;
+  } else {
+    elements.cloudQuota.textContent = "";
+  }
+}
+
+function setCloudActionBusy(isBusy) {
+  state.cloudOperationInProgress = isBusy;
+  elements.cloudConnect.disabled = isBusy;
+  elements.cloudSync.disabled = isBusy || !state.cloudAuthed;
+}
+
+async function initializeCloudSection() {
+  state.cloudProvider = new CloudStorage({
+    provider: new NoOpCloudProvider()
+  });
+
+  const initResult = await state.cloudProvider.initialize();
+  if (!initResult.success) {
+    setCloudStatus("云服务初始化失败", "error", true);
+    setCloudActionBusy(false);
+    return;
+  }
+
+  const ready = await state.cloudProvider.isReady();
+  state.cloudAuthed = ready;
+
+  if (ready) {
+    setCloudStatus("已连接云服务", "connected");
+    elements.cloudBackupsContainer.classList.remove("hidden");
+    await refreshCloudBackups();
+  } else {
+    setCloudStatus("未连接云服务（当前为占位 Provider）", "needs-auth");
+    elements.cloudBackupsContainer.classList.add("hidden");
+  }
+
+  setCloudActionBusy(false);
+}
+
+async function handleCloudConnect() {
+  if (!state.cloudProvider || state.cloudOperationInProgress) {
+    return;
+  }
+
+  setCloudActionBusy(true);
+  setCloudStatus("正在连接云服务...", "needs-auth");
+
+  try {
+    const result = await state.cloudProvider.requestCloudAuth();
+    if (result.success) {
+      state.cloudAuthed = true;
+      setCloudStatus("云服务连接成功", "connected");
+      elements.cloudBackupsContainer.classList.remove("hidden");
+      await refreshCloudBackups();
+    } else {
+      state.cloudAuthed = false;
+      const message = result.error?.message || "连接失败";
+      setCloudStatus(`连接失败：${message}`, "error", true);
+    }
+  } catch (error) {
+    state.cloudAuthed = false;
+    setCloudStatus(error instanceof Error ? error.message : "连接失败", "error", true);
+  } finally {
+    setCloudActionBusy(false);
+  }
+}
+
+async function handleCloudSync() {
+  if (!state.cloudProvider || state.cloudOperationInProgress) {
+    return;
+  }
+
+  setCloudActionBusy(true);
+  setCloudStatus("正在同步到云端...", "connected");
+
+  try {
+    const snapshot = await exportBackupSnapshot();
+    const payload = createBackupPayload(snapshot);
+    const result = await state.cloudProvider.backupToCloud(payload, {
+      fileName: createBackupFilename()
+    });
+
+    if (result.success) {
+      setCloudStatus("云端备份已更新", "connected");
+      elements.cloudBackupsContainer.classList.remove("hidden");
+      await refreshCloudBackups();
+    } else {
+      const message = result.error?.message || "同步失败";
+      setCloudStatus(`同步失败：${message}`, "error", true);
+    }
+  } catch (error) {
+    setCloudStatus(error instanceof Error ? error.message : "同步失败", "error", true);
+  } finally {
+    setCloudActionBusy(false);
+  }
 }
 
 async function refreshRecentReads() {
@@ -1065,6 +1260,12 @@ function bindEvents() {
     handleExportBackup();
   });
   elements.importBackup.addEventListener("change", handleImportBackup);
+  elements.cloudConnect?.addEventListener("click", () => {
+    handleCloudConnect();
+  });
+  elements.cloudSync?.addEventListener("click", () => {
+    handleCloudSync();
+  });
   elements.librarySelect.addEventListener("change", (event) => {
     if (event.target.value) {
       loadBook(event.target.value);
@@ -1224,6 +1425,7 @@ async function bootstrap() {
   renderBookmarks();
   renderStats();
   bindEvents();
+  await initializeCloudSection();
   await refreshRecentReads();
 
   if (state.books[0]) {

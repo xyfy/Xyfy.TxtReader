@@ -498,6 +498,99 @@ body.is-immersive .paper-page {
   gap: 8px;
 }
 
+/* Cloud Backup UI Styles */
+.status-badge {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 10px;
+  text-align: center;
+  color: #999;
+  font-weight: bold;
+  margin-left: 4px;
+}
+
+.status-badge[data-status="connected"] {
+  color: #4caf50;
+}
+
+.status-badge[data-status="authed"] {
+  color: #4caf50;
+}
+
+.status-badge[data-status="needs-auth"] {
+  color: #ff9800;
+}
+
+.status-badge[data-status="error"] {
+  color: #f44336;
+}
+
+#cloud-section .action-row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#cloud-backups-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+#cloud-backups-list .list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9em;
+}
+
+#cloud-backups-list .list-item:last-child {
+  border-bottom: none;
+}
+
+#cloud-backups-list .backup-info {
+  flex: 1;
+}
+
+#cloud-backups-list .backup-name {
+  font-weight: 500;
+  word-break: break-word;
+}
+
+#cloud-backups-list .backup-time {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 2px;
+}
+
+#cloud-backups-list .backup-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+#cloud-backups-list .backup-actions button {
+  padding: 2px 6px;
+  font-size: 0.85em;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#cloud-backups-list .backup-actions button:hover {
+  background: #e0e0e0;
+}
+
+.hidden {
+  display: none !important;
+}
+
 .mode-hint {
   display: inline-flex;
   align-items: center;
