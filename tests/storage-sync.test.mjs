@@ -23,24 +23,26 @@ function run() {
   assert.equal(detectBrowserProvider("Mozilla/5.0 Safari/605.1.15"), "unknown");
 
   const originalChrome = globalThis.chrome;
-  globalThis.chrome = {
-    storage: {
-      local: {},
-      sync: {}
-    }
-  };
-  const supportAvailable = getSyncSupportInfo();
-  assert.equal(supportAvailable.syncAvailable, true);
+  try {
+    globalThis.chrome = {
+      storage: {
+        local: {},
+        sync: {}
+      }
+    };
+    const supportAvailable = getSyncSupportInfo();
+    assert.equal(supportAvailable.syncAvailable, true);
 
-  globalThis.chrome = {
-    storage: {
-      local: {}
-    }
-  };
-  const supportUnavailable = getSyncSupportInfo();
-  assert.equal(supportUnavailable.syncAvailable, false);
-
-  globalThis.chrome = originalChrome;
+    globalThis.chrome = {
+      storage: {
+        local: {}
+      }
+    };
+    const supportUnavailable = getSyncSupportInfo();
+    assert.equal(supportUnavailable.syncAvailable, false);
+  } finally {
+    globalThis.chrome = originalChrome;
+  }
 
   console.log("storage sync tests passed");
 }
