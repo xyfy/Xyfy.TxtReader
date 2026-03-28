@@ -46,41 +46,7 @@
           <div id="bookmark-list" class="list"></div>
         </section>
 
-        <section class="panel-block">
-          <div class="section-head">
-            <p class="panel-label" data-i18n="readerBackup">Backup</p>
-          </div>
-          <div class="action-row">
-            <button id="export-backup" type="button" data-i18n="readerExportJson">Export JSON</button>
-            <label class="file-picker inline-picker">
-              <input id="import-backup" type="file" accept="application/json,.json" />
-              <span data-i18n="readerImportBackup">Restore Backup</span>
-            </label>
-          </div>
-          <p id="backup-status" class="file-meta" data-i18n="readerBackupHint">Export or restore books, progress, bookmarks, and reading settings</p>
-          <div class="reset-panel">
-            <p class="file-meta reset-label" data-i18n="readerResetTitle">Reset data</p>
-            <label class="reset-option">
-              <input id="reset-target-settings" type="checkbox" checked />
-              <span data-i18n="readerResetTargetSettings">Reading settings</span>
-            </label>
-            <label class="reset-option">
-              <input id="reset-target-progress" type="checkbox" checked />
-              <span data-i18n="readerResetTargetProgress">Reading progress</span>
-            </label>
-            <label class="reset-option">
-              <input id="reset-target-bookmarks" type="checkbox" checked />
-              <span data-i18n="readerResetTargetBookmarks">Bookmarks</span>
-            </label>
-            <label class="reset-option">
-              <input id="reset-target-books" type="checkbox" />
-              <span data-i18n="readerResetTargetBooks">Imported books</span>
-            </label>
-            <button id="reset-data" type="button" data-i18n="readerResetAction">Reset selected items</button>
-          </div>
-        </section>
-
-        <section class="panel-block">
+        <section id="stats-section" class="panel-block hidden">
           <div class="section-head">
             <p class="panel-label" data-i18n="readerStats">Reading Stats</p>
           </div>
@@ -95,6 +61,14 @@
             <h1 id="book-title">Xyfy TXT Reader</h1>
           </div>
           <div class="header-actions">
+            <label class="inline-language">
+              <span data-i18n="readerLanguageLabel">语言</span>
+              <select id="language-select">
+                <option value="zh_CN" data-i18n="readerLanguageZh">简体中文</option>
+                <option value="en" data-i18n="readerLanguageEn">English</option>
+              </select>
+            </label>
+            <button id="settings-toggle" type="button" data-i18n="readerManageButton" data-i18n-attr="title:readerManageTitle">管理</button>
             <button id="toggle-panel" type="button" title="Show or hide sidebar (Tab)" data-i18n-attr="title:readerTogglePanelTitle">☰</button>
             <button id="immersive-toggle" class="icon-button" type="button" title="Enter immersive mode" aria-label="Enter immersive mode" data-i18n-attr="title:readerImmersiveEnter;aria-label:readerImmersiveEnter">
               <span class="icon-frame" aria-hidden="true"></span>
@@ -185,6 +159,81 @@
               <div><strong>Alt + D</strong><span data-i18n="readerShortcutsDescDebug">Toggle the pagination debug panel</span></div>
               <div><strong>Esc</strong><span data-i18n="readerShortcutsDescEsc">Close the shortcuts overlay</span></div>
             </div>
+          </div>
+        </div>
+        <div id="settings-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+          <div class="overlay-card settings-card">
+            <div class="section-head overlay-head">
+              <h2 id="settings-title" data-i18n="readerManageTitle">阅读管理</h2>
+              <button id="settings-close" class="small-button" type="button" data-i18n="readerShortcutsClose">关闭</button>
+            </div>
+            <label class="settings-switch">
+              <input id="show-stats" type="checkbox" />
+              <span data-i18n="readerManageShowStats">显示统计信息</span>
+            </label>
+            <section class="settings-section">
+              <div class="section-head">
+                <p class="panel-label" data-i18n="readerBackup">Backup</p>
+              </div>
+              <div class="action-row">
+                <button id="export-backup" type="button" data-i18n="readerExportJson">Export JSON</button>
+                <label class="file-picker inline-picker">
+                  <input id="import-backup" type="file" accept="application/json,.json" />
+                  <span data-i18n="readerImportBackup">Restore Backup</span>
+                </label>
+              </div>
+              <p id="backup-status" class="file-meta" data-i18n="readerBackupHint">Export or restore books, progress, bookmarks, and reading settings</p>
+              <div class="reset-panel">
+                <p class="file-meta reset-label" data-i18n="readerResetTitle">Reset data</p>
+                <label class="reset-option">
+                  <input id="reset-target-settings" type="checkbox" checked />
+                  <span data-i18n="readerResetTargetSettings">Reading settings</span>
+                </label>
+                <label class="reset-option">
+                  <input id="reset-target-progress" type="checkbox" checked />
+                  <span data-i18n="readerResetTargetProgress">Reading progress</span>
+                </label>
+                <label class="reset-option">
+                  <input id="reset-target-bookmarks" type="checkbox" checked />
+                  <span data-i18n="readerResetTargetBookmarks">Bookmarks</span>
+                </label>
+                <label class="reset-option">
+                  <input id="reset-target-books" type="checkbox" />
+                  <span data-i18n="readerResetTargetBooks">Imported books</span>
+                </label>
+                <button id="reset-data" type="button" data-i18n="readerResetAction">Reset selected items</button>
+              </div>
+            </section>
+            <section id="cloud-section" class="settings-section">
+              <div class="section-head">
+                <p class="panel-label" data-i18n="readerCloudBackup">云备份</p>
+                <span id="cloud-status-badge" class="status-badge" title="未连接" data-i18n-attr="title:readerCloudNeedConfig">◦</span>
+              </div>
+              <div class="cloud-config">
+                <label class="cloud-config-item">
+                  <span data-i18n="readerCloudGistId">Gist ID</span>
+                  <input id="cloud-gist-id" type="text" placeholder="e.g. a1b2c3d4..." autocomplete="off" data-i18n-attr="placeholder:readerCloudGistIdPlaceholder" />
+                </label>
+                <label class="cloud-config-item">
+                  <span data-i18n="readerCloudToken">Token</span>
+                  <div class="token-row">
+                    <input id="cloud-gist-token" type="password" placeholder="GitHub Personal Access Token" autocomplete="off" data-i18n-attr="placeholder:readerCloudTokenPlaceholder" />
+                    <button id="cloud-token-toggle" type="button" class="small-button" data-i18n="readerCloudToggleTokenShow">显示</button>
+                  </div>
+                </label>
+                <p class="file-meta cloud-token-note" data-i18n="readerCloudTokenRequirement">Token 需要具备 Gist 写入权限（经典 token 选 gist，或细粒度 token 授予 gist 访问）。</p>
+              </div>
+              <div class="action-row">
+                <button id="cloud-connect" type="button" data-i18n="readerCloudConnect">连接 Gist</button>
+                <button id="cloud-sync" type="button" disabled data-i18n="readerCloudSync">同步</button>
+              </div>
+              <div id="cloud-backups-container" class="hidden">
+                <p class="panel-label cloud-backups-title" data-i18n="readerCloudBackups">云备份列表</p>
+                <div id="cloud-backups-list" class="list"></div>
+                <p id="cloud-quota" class="file-meta cloud-quota"></p>
+              </div>
+              <p id="cloud-status" class="file-meta" data-i18n="readerCloudStatusHint">填写你自己的 Gist ID 和 Token，备份写入你的 Gist</p>
+            </section>
           </div>
         </div>
         <button id="immersive-exit" class="immersive-exit icon-button hidden" type="button" title="Exit immersive mode" aria-label="Exit immersive mode" data-i18n-attr="title:readerImmersiveExit;aria-label:readerImmersiveExit">

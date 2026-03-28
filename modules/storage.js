@@ -9,7 +9,8 @@ const DEFAULT_SETTINGS = {
   lineHeight: 1.8,
   readingMode: "book",
   animationStyle: "slide",
-  animationIntensity: 2
+  animationIntensity: 2,
+  showStats: false
 };
 const DATABASE_NAME = "xyfy-txt-reader";
 const DATABASE_VERSION = 1;

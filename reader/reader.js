@@ -2,8 +2,9 @@ import { readTxtFile } from "../modules/file-handler.js";
 import { createBackupFilename, createBackupPayload, parseBackupPayload } from "../modules/backup.js";
 import { parseChapters } from "../modules/chapter-parser.js";
 import { createRenderedChapterPager, paginateChapter } from "../modules/paginator.js";
-import { applyI18n, getDocumentLanguage, t } from "../modules/i18n.js";
-import { resolveReaderKeyAction } from "../modules/keyboard-map.js";
+import { CloudStorage } from "../modules/cloud-storage.js";
+import { GistProvider } from "../modules/gist-provider.js";
+import { applyI18n, getCurrentLocale, initializeI18n, setLocale, t } from "../modules/i18n.js";
 import {
   deleteBookmark,
   exportBackupSnapshot,
@@ -11,12 +12,10 @@ import {
   getDefaultSettings,
   getProgress,
   getReaderSettings,
-  getSyncSupportInfo,
   importBackupSnapshot,
   listAllProgress,
   listBookmarks,
   listBooks,
-  resetReaderData,
   saveBook,
   saveBookmark,
   saveProgress,
@@ -37,7 +36,16 @@ const state = {
   lastPageDimensions: null,
   pagesPerView: 2,
   currentChapterIndex: 0,
-  currentPageIndex: 0
+  currentPageIndex: 0,
+  cloudProvider: null,
+  cloudProviderName: "GitHub Gist",
+  cloudConfig: {
+    gistId: "",
+    token: ""
+  },
+  cloudTokenVisible: false,
+  cloudAuthed: false,
+  cloudOperationInProgress: false
 };
 
 const PAGE_CACHE_LIMIT = 8;
@@ -48,11 +56,16 @@ const elements = {
   exportBackup: document.getElementById("export-backup"),
   importBackup: document.getElementById("import-backup"),
   backupStatus: document.getElementById("backup-status"),
-  resetData: document.getElementById("reset-data"),
-  resetSettingsInput: document.getElementById("reset-target-settings"),
-  resetProgressInput: document.getElementById("reset-target-progress"),
-  resetBookmarksInput: document.getElementById("reset-target-bookmarks"),
-  resetBooksInput: document.getElementById("reset-target-books"),
+  cloudGistId: document.getElementById("cloud-gist-id"),
+  cloudGistToken: document.getElementById("cloud-gist-token"),
+  cloudTokenToggle: document.getElementById("cloud-token-toggle"),
+  cloudConnect: document.getElementById("cloud-connect"),
+  cloudSync: document.getElementById("cloud-sync"),
+  cloudStatus: document.getElementById("cloud-status"),
+  cloudStatusBadge: document.getElementById("cloud-status-badge"),
+  cloudBackupsContainer: document.getElementById("cloud-backups-container"),
+  cloudBackupsList: document.getElementById("cloud-backups-list"),
+  cloudQuota: document.getElementById("cloud-quota"),
   librarySelect: document.getElementById("library-select"),
   recentList: document.getElementById("recent-list"),
   statsList: document.getElementById("stats-list"),
@@ -77,8 +90,14 @@ const elements = {
   fontSize: document.getElementById("font-size"),
   animationStyle: document.getElementById("animation-style"),
   animationIntensity: document.getElementById("animation-intensity"),
+  showStats: document.getElementById("show-stats"),
+  languageSelect: document.getElementById("language-select"),
   spreadShell: document.querySelector(".spread-shell"),
   appShell: document.querySelector(".app-shell"),
+  settingsToggle: document.getElementById("settings-toggle"),
+  settingsOverlay: document.getElementById("settings-overlay"),
+  settingsClose: document.getElementById("settings-close"),
+  statsSection: document.getElementById("stats-section"),
   togglePanel: document.getElementById("toggle-panel"),
   immersiveToggle: document.getElementById("immersive-toggle"),
   immersiveExit: document.getElementById("immersive-exit"),
@@ -96,6 +115,7 @@ let resizeTimer = null;
 let modeHintTimer = null;
 let warmupTimer = null;
 let shortcutsOpen = false;
+let settingsOpen = false;
 
 function requestWarmupWork(callback) {
   if (typeof window.requestIdleCallback === "function") {
@@ -143,8 +163,6 @@ function updateImmersiveButton() {
   elements.immersiveToggle.setAttribute("aria-pressed", String(state.immersiveActive));
   elements.immersiveToggle.setAttribute("aria-label", state.immersiveActive ? t("readerImmersiveExit") : t("readerImmersiveEnter"));
   elements.immersiveToggle.title = state.immersiveActive ? t("readerImmersiveExit") : t("readerImmersiveEnter");
-  elements.immersiveExit.setAttribute("aria-label", t("readerImmersiveExit"));
-  elements.immersiveExit.title = t("readerImmersiveExit");
   elements.immersiveExit.classList.toggle("hidden", !state.immersiveActive);
 }
 
@@ -362,6 +380,349 @@ function setBackupStatus(message, isError = false) {
   elements.backupStatus.style.color = isError ? "#b5442a" : "";
 }
 
+function setCloudStatus(message, status = "idle", isError = false) {
+  elements.cloudStatus.textContent = message;
+  elements.cloudStatus.style.color = isError ? "#b5442a" : "";
+  elements.cloudStatusBadge.dataset.status = status;
+  elements.cloudStatusBadge.title = message;
+}
+
+function updateTokenVisibility() {
+  if (!elements.cloudGistToken || !elements.cloudTokenToggle) {
+    return;
+  }
+
+  elements.cloudGistToken.type = state.cloudTokenVisible ? "text" : "password";
+  elements.cloudTokenToggle.textContent = state.cloudTokenVisible
+    ? t("readerCloudToggleTokenHide")
+    : t("readerCloudToggleTokenShow");
+}
+
+function refreshI18nUi() {
+  applyI18n();
+
+  if (elements.languageSelect) {
+    elements.languageSelect.value = getCurrentLocale();
+  }
+
+  if (elements.cloudGistId) {
+    elements.cloudGistId.placeholder = t("readerCloudGistIdPlaceholder");
+  }
+  if (elements.cloudGistToken) {
+    elements.cloudGistToken.placeholder = t("readerCloudTokenPlaceholder");
+  }
+
+  updateTokenVisibility();
+  updateNavButtonLabels();
+}
+
+const GIST_CONFIG_KEY = "gistCloudConfig";
+
+function loadGistConfig() {
+  return new Promise((resolve) => {
+    if (!globalThis.chrome?.storage?.local) {
+      resolve({ gistId: "", token: "" });
+      return;
+    }
+
+    chrome.storage.local.get([GIST_CONFIG_KEY], (result) => {
+      const config = result[GIST_CONFIG_KEY] || {};
+      resolve({
+        gistId: typeof config.gistId === "string" ? config.gistId : "",
+        token: typeof config.token === "string" ? config.token : ""
+      });
+    });
+  });
+}
+
+function saveGistConfig(config) {
+  return new Promise((resolve) => {
+    if (!globalThis.chrome?.storage?.local) {
+      resolve();
+      return;
+    }
+
+    chrome.storage.local.set({ [GIST_CONFIG_KEY]: config }, () => resolve());
+  });
+}
+
+function formatCloudTime(isoString) {
+  if (!isoString) {
+    return t("readerUnknownTime");
+  }
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return t("readerUnknownTime");
+  }
+  const locale = getCurrentLocale() === "zh_CN" ? "zh-CN" : "en-US";
+  return date.toLocaleString(locale, { hour12: false });
+}
+
+async function handleCloudRestore(fileId) {
+  if (!fileId || !state.cloudProvider || state.cloudOperationInProgress) {
+    return;
+  }
+
+  setCloudActionBusy(true);
+  setCloudStatus(t("readerCloudRestoring"), "connected");
+
+  try {
+    const restoreResult = await state.cloudProvider.restoreFromCloud(fileId);
+    if (!restoreResult.success) {
+      throw restoreResult.error || new Error(t("readerCloudRestoreFailed"));
+    }
+
+    const payload = parseBackupPayload(JSON.stringify(restoreResult.data));
+    const importResult = await importBackupSnapshot(payload);
+
+    state.chapterPageCache.clear();
+    state.settings = await getReaderSettings();
+    applySettings();
+    detectPagesPerView();
+    state.books = await listBooks();
+    renderLibrary();
+    await refreshRecentReads();
+
+    const preferredBookId = state.book?.id || payload.books[0]?.id || state.books[0]?.id;
+    if (preferredBookId) {
+      await loadBook(preferredBookId);
+    } else {
+      renderBookmarks();
+      renderToc();
+      renderSpread();
+    }
+
+    setCloudStatus(
+      t("readerCloudRestoreDone", {
+        books: importResult.booksImported,
+        progress: importResult.progressImported,
+        bookmarks: importResult.bookmarksImported
+      }),
+      "connected"
+    );
+  } catch (error) {
+    setCloudStatus(error instanceof Error ? error.message : t("readerCloudRestoreFailed"), "error", true);
+  } finally {
+    setCloudActionBusy(false);
+  }
+}
+
+async function handleCloudDelete(fileId) {
+  if (!fileId || !state.cloudProvider || state.cloudOperationInProgress) {
+    return;
+  }
+
+  const confirmed = window.confirm(t("readerCloudDeleteConfirm"));
+  if (!confirmed) {
+    return;
+  }
+
+  setCloudActionBusy(true);
+  setCloudStatus(t("readerCloudDeleting"), "connected");
+
+  try {
+    const result = await state.cloudProvider.deleteCloudBackup(fileId);
+    if (!result.success) {
+      throw result.error || new Error(t("readerCloudDeleteFailed"));
+    }
+    setCloudStatus(t("readerCloudDeleted"), "connected");
+    await refreshCloudBackups();
+  } catch (error) {
+    setCloudStatus(error instanceof Error ? error.message : t("readerCloudDeleteFailed"), "error", true);
+  } finally {
+    setCloudActionBusy(false);
+  }
+}
+
+function renderCloudBackups(backups) {
+  elements.cloudBackupsList.innerHTML = "";
+  if (!Array.isArray(backups) || backups.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "file-meta";
+    empty.textContent = t("readerCloudBackupEmpty");
+    elements.cloudBackupsList.append(empty);
+    return;
+  }
+
+  for (const backup of backups) {
+    const row = document.createElement("div");
+    row.className = "list-item";
+
+    const info = document.createElement("div");
+    info.className = "backup-info";
+
+    const name = document.createElement("div");
+    name.className = "backup-name";
+    name.textContent = backup.fileName || t("readerCloudBackupUnnamed");
+
+    const time = document.createElement("div");
+    time.className = "backup-time";
+    time.textContent = `${formatCloudTime(backup.uploadedAt)} · ${formatSize(Number(backup.size || 0))}`;
+
+    info.append(name, time);
+
+    const actions = document.createElement("div");
+    actions.className = "backup-actions";
+
+    const restoreButton = document.createElement("button");
+    restoreButton.type = "button";
+    restoreButton.textContent = t("readerCloudRestore");
+    restoreButton.addEventListener("click", () => {
+      handleCloudRestore(backup.fileId);
+    });
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.textContent = t("readerCloudDelete");
+    removeButton.addEventListener("click", () => {
+      handleCloudDelete(backup.fileId);
+    });
+
+    actions.append(restoreButton, removeButton);
+    row.append(info, actions);
+    elements.cloudBackupsList.append(row);
+  }
+}
+
+async function refreshCloudBackups() {
+  if (!state.cloudProvider) {
+    return;
+  }
+
+  const [listResult, quotaResult] = await Promise.all([
+    state.cloudProvider.listCloudBackups({ limit: 20 }),
+    state.cloudProvider.getCloudQuota()
+  ]);
+
+  if (listResult.success) {
+    renderCloudBackups(listResult.data);
+  } else {
+    renderCloudBackups([]);
+  }
+
+  if (quotaResult.success && quotaResult.data) {
+    const quota = quotaResult.data;
+    elements.cloudQuota.textContent = t("readerCloudQuota", {
+      used: formatSize(Number(quota.usedBytes || 0)),
+      total: formatSize(Number(quota.totalBytes || 0))
+    });
+  } else {
+    elements.cloudQuota.textContent = "";
+  }
+}
+
+function setCloudActionBusy(isBusy) {
+  state.cloudOperationInProgress = isBusy;
+  elements.cloudConnect.disabled = isBusy;
+  elements.cloudSync.disabled = isBusy || !state.cloudAuthed;
+}
+
+async function initializeCloudSection() {
+  state.cloudConfig = await loadGistConfig();
+  if (elements.cloudGistId) {
+    elements.cloudGistId.value = state.cloudConfig.gistId;
+  }
+  if (elements.cloudGistToken) {
+    elements.cloudGistToken.value = state.cloudConfig.token;
+  }
+
+  const provider = new GistProvider(state.cloudConfig);
+  const providerMeta = provider.getMetadata();
+  state.cloudProviderName = providerMeta.name || t("readerCloudProviderFallback");
+
+  state.cloudProvider = new CloudStorage({
+    provider
+  });
+
+  const initResult = await state.cloudProvider.initialize();
+  if (!initResult.success) {
+    setCloudStatus(`${state.cloudProviderName} ${t("readerInitFailed")}`, "error", true);
+    setCloudActionBusy(false);
+    return;
+  }
+
+  const ready = await state.cloudProvider.isReady();
+  state.cloudAuthed = ready;
+
+  if (ready) {
+    setCloudStatus(t("readerCloudConnected", { provider: state.cloudProviderName }), "connected");
+    elements.cloudBackupsContainer.classList.remove("hidden");
+    await refreshCloudBackups();
+  } else {
+    setCloudStatus(t("readerCloudNeedConfig"), "needs-auth");
+    elements.cloudBackupsContainer.classList.add("hidden");
+  }
+
+  setCloudActionBusy(false);
+}
+
+async function handleCloudConnect() {
+  if (!state.cloudProvider || state.cloudOperationInProgress || elements.cloudConnect.disabled) {
+    return;
+  }
+
+  setCloudActionBusy(true);
+  setCloudStatus(t("readerCloudConnecting", { provider: state.cloudProviderName }), "needs-auth");
+
+  try {
+    const gistId = elements.cloudGistId?.value?.trim() || "";
+    const token = elements.cloudGistToken?.value?.trim() || "";
+
+    if (!gistId || !token) {
+      throw new Error(t("readerCloudNeedConfig"));
+    }
+
+    const result = await state.cloudProvider.requestCloudAuth({ gistId, token });
+    if (result.success) {
+      state.cloudAuthed = true;
+      state.cloudConfig = { gistId, token };
+      await saveGistConfig(state.cloudConfig);
+      setCloudStatus(t("readerCloudConnected", { provider: state.cloudProviderName }), "connected");
+      elements.cloudBackupsContainer.classList.remove("hidden");
+      await refreshCloudBackups();
+    } else {
+      state.cloudAuthed = false;
+      const message = result.error?.message || t("readerCloudConnectFailedShort");
+      setCloudStatus(t("readerCloudConnectFailed", { message }), "error", true);
+    }
+  } catch (error) {
+    state.cloudAuthed = false;
+    setCloudStatus(error instanceof Error ? error.message : t("readerCloudConnectFailed", { message: "" }), "error", true);
+  } finally {
+    setCloudActionBusy(false);
+  }
+}
+
+async function handleCloudSync() {
+  if (!state.cloudProvider || state.cloudOperationInProgress) {
+    return;
+  }
+
+  setCloudActionBusy(true);
+  setCloudStatus(t("readerCloudSyncing"), "connected");
+
+  try {
+    const snapshot = await exportBackupSnapshot();
+    const payload = createBackupPayload(snapshot);
+    const result = await state.cloudProvider.backupToCloud(payload, {
+      fileName: createBackupFilename()
+    });
+
+    if (result.success) {
+      setCloudStatus(t("readerCloudSynced"), "connected");
+      elements.cloudBackupsContainer.classList.remove("hidden");
+      await refreshCloudBackups();
+    } else {
+      const message = result.error?.message || t("readerCloudSyncFailedShort");
+      setCloudStatus(t("readerCloudSyncFailed", { message }), "error", true);
+    }
+  } catch (error) {
+    setCloudStatus(error instanceof Error ? error.message : t("readerCloudSyncFailed", { message: "" }), "error", true);
+  } finally {
+    setCloudActionBusy(false);
+  }
+}
+
 async function refreshRecentReads() {
   const [progressList, books] = await Promise.all([listAllProgress(), listBooks()]);
   const bookMap = new Map(books.map((book) => [book.id, book]));
@@ -398,6 +759,11 @@ async function refreshRecentReads() {
 }
 
 function renderStats() {
+  if (!state.settings.showStats) {
+    elements.statsList.innerHTML = "";
+    return;
+  }
+
   const stats = [];
   const chapter = state.book?.chapters?.[state.currentChapterIndex];
   const chapterCount = state.book?.chapters?.length || 0;
@@ -408,11 +774,14 @@ function renderStats() {
     ? elements.pageIndicator.textContent || "0%"
     : `${Math.floor(state.currentPageIndex / Math.max(1, state.pagesPerView)) + 1} / ${Math.max(1, Math.ceil(state.pages.length / Math.max(1, state.pagesPerView)))}`;
 
-  stats.push([t("readerStatsMode"), isScrollMode() ? t("readerStatsModeScroll") : state.pagesPerView === 2 ? t("readerStatsModeBookDouble") : t("readerStatsModeBookSingle")]);
+  stats.push([
+    t("readerStatsMode"),
+    isScrollMode() ? t("readerStatsModeScroll") : state.pagesPerView === 2 ? t("readerStatsModeBookDouble") : t("readerStatsModeBookSingle")
+  ]);
   stats.push([t("readerStatsChapter"), chapterProgress]);
   stats.push([t("readerStatsPageProgress"), pageProgress]);
-  stats.push([t("readerStatsChapterChars"), chapterChars ? t("readerCharsUnit", { count: chapterChars.toLocaleString(getDocumentLanguage()) }) : "-"]);
-  stats.push([t("readerStatsTotalChars"), totalChars ? t("readerCharsUnit", { count: totalChars.toLocaleString(getDocumentLanguage()) }) : "-"]);
+  stats.push([t("readerStatsChapterChars"), chapterChars ? t("readerCharsUnit", { count: chapterChars.toLocaleString() }) : "-"]);
+  stats.push([t("readerStatsTotalChars"), totalChars ? t("readerCharsUnit", { count: totalChars.toLocaleString() }) : "-"]);
   stats.push([t("readerStatsBookmarkCount"), `${state.bookmarks.length}`]);
 
   elements.statsList.innerHTML = "";
@@ -431,6 +800,11 @@ function renderStats() {
 function setShortcutsOverlay(open) {
   shortcutsOpen = open;
   elements.shortcutsOverlay.classList.toggle("hidden", !open);
+}
+
+function setSettingsOverlay(open) {
+  settingsOpen = open;
+  elements.settingsOverlay?.classList.toggle("hidden", !open);
 }
 
 function renderLibrary() {
@@ -521,6 +895,10 @@ function applySettings() {
   elements.fontSize.value = String(state.settings.fontSize);
   elements.animationStyle.value = state.settings.animationStyle || "slide";
   elements.animationIntensity.value = String(state.settings.animationIntensity || 2);
+  if (elements.showStats) {
+    elements.showStats.checked = Boolean(state.settings.showStats);
+  }
+  elements.statsSection?.classList.toggle("hidden", !state.settings.showStats);
   const disableAnimation = isScrollMode();
   elements.animationStyle.disabled = disableAnimation;
   elements.animationIntensity.disabled = disableAnimation;
@@ -622,7 +1000,7 @@ function renderSpread() {
       state.activePaginationSession.chapterIndex === state.currentChapterIndex
   );
 
-  elements.bookTitle.textContent = state.book?.name || t("extName");
+  elements.bookTitle.textContent = state.book?.name || "Xyfy TXT Reader";
   elements.leftTitle.textContent = chapter?.title || "";
   elements.rightTitle.textContent = chapter?.title || "";
   elements.leftPage.textContent = left || t("readerCurrentPageEmpty");
@@ -917,11 +1295,13 @@ async function handleExportBackup() {
   link.download = createBackupFilename();
   link.click();
   URL.revokeObjectURL(url);
-  setBackupStatus(t("readerBackupExported", {
-    books: payload.books.length,
-    progress: payload.progress.length,
-    bookmarks: payload.bookmarks.length
-  }));
+  setBackupStatus(
+    t("readerBackupExported", {
+      books: payload.books.length,
+      progress: payload.progress.length,
+      bookmarks: payload.bookmarks.length
+    })
+  );
 }
 
 async function handleImportBackup(event) {
@@ -968,10 +1348,6 @@ async function handleImportBackup(event) {
 }
 
 function goToChapter(index) {
-  if (!state.book || index < 0 || index >= state.book.chapters.length) {
-    return;
-  }
-
   state.currentChapterIndex = index;
   state.currentPageIndex = 0;
   rebuildPages();
@@ -998,94 +1374,6 @@ function nextPage() {
 
   if (state.currentChapterIndex + 1 < state.book.chapters.length) {
     goToChapter(state.currentChapterIndex + 1);
-  }
-}
-
-function selectedResetTargets() {
-  return {
-    settings: Boolean(elements.resetSettingsInput?.checked),
-    progress: Boolean(elements.resetProgressInput?.checked),
-    bookmarks: Boolean(elements.resetBookmarksInput?.checked),
-    books: Boolean(elements.resetBooksInput?.checked)
-  };
-}
-
-function describeResetTargets(targets) {
-  const labels = [];
-  if (targets.settings) {
-    labels.push(t("readerResetTargetSettings"));
-  }
-  if (targets.progress) {
-    labels.push(t("readerResetTargetProgress"));
-  }
-  if (targets.bookmarks) {
-    labels.push(t("readerResetTargetBookmarks"));
-  }
-  if (targets.books) {
-    labels.push(t("readerResetTargetBooks"));
-  }
-
-  return labels;
-}
-
-async function handleResetData() {
-  const targets = selectedResetTargets();
-  const labels = describeResetTargets(targets);
-  if (!labels.length) {
-    setBackupStatus(t("readerResetNothingSelected"), true);
-    return;
-  }
-
-  const confirmed = window.confirm(
-    t("readerResetConfirm", {
-      targets: labels.join(" / ")
-    })
-  );
-  if (!confirmed) {
-    return;
-  }
-
-  try {
-    await resetReaderData(targets);
-    state.chapterPageCache.clear();
-
-    if (targets.settings) {
-      state.settings = await getReaderSettings();
-      applySettings();
-      detectPagesPerView();
-    }
-
-    state.books = await listBooks();
-    renderLibrary();
-    await refreshRecentReads();
-
-    if (!state.books.length) {
-      state.book = null;
-      state.bookmarks = [];
-      state.pages = [];
-      state.currentChapterIndex = 0;
-      state.currentPageIndex = 0;
-      elements.fileMeta.textContent = t("readerNoFile");
-      renderBookmarks();
-      renderToc();
-      renderSpread();
-    } else {
-      const currentBookStillExists = state.book && state.books.some((item) => item.id === state.book.id);
-      if (currentBookStillExists) {
-        await loadBook(state.book.id);
-      } else {
-        await loadBook(state.books[0].id);
-      }
-    }
-
-    setBackupStatus(
-      t("readerResetDone", {
-        targets: labels.join(" / ")
-      })
-    );
-  } catch (error) {
-    console.error(error);
-    setBackupStatus(error instanceof Error ? error.message : t("readerResetFailed"), true);
   }
 }
 
@@ -1145,7 +1433,8 @@ async function handleSettingsChange() {
     fontSize: Number(elements.fontSize.value),
     lineHeight: state.settings.lineHeight,
     animationStyle: elements.animationStyle.value,
-    animationIntensity: Number(elements.animationIntensity.value)
+    animationIntensity: Number(elements.animationIntensity.value),
+    showStats: Boolean(elements.showStats?.checked)
   };
   applySettings();
   detectPagesPerView();
@@ -1182,11 +1471,27 @@ function bindEvents() {
     handleExportBackup();
   });
   elements.importBackup.addEventListener("change", handleImportBackup);
-  if (elements.resetData) {
-    elements.resetData.addEventListener("click", () => {
-      handleResetData();
-    });
-  }
+  elements.cloudConnect?.addEventListener("click", () => {
+    handleCloudConnect();
+  });
+  elements.cloudSync?.addEventListener("click", () => {
+    handleCloudSync();
+  });
+  elements.cloudTokenToggle?.addEventListener("click", () => {
+    state.cloudTokenVisible = !state.cloudTokenVisible;
+    updateTokenVisibility();
+  });
+  elements.languageSelect?.addEventListener("change", async (event) => {
+    const nextLocale = event.target.value;
+    await setLocale(nextLocale);
+    refreshI18nUi();
+    renderLibrary();
+    renderBookmarks();
+    renderStats();
+    renderToc();
+    renderSpread();
+    await refreshRecentReads();
+  });
   elements.librarySelect.addEventListener("change", (event) => {
     if (event.target.value) {
       loadBook(event.target.value);
@@ -1215,6 +1520,17 @@ function bindEvents() {
   elements.shortcutsToggle.addEventListener("click", () => {
     setShortcutsOverlay(true);
   });
+  elements.settingsToggle?.addEventListener("click", () => {
+    setSettingsOverlay(true);
+  });
+  elements.settingsClose?.addEventListener("click", () => {
+    setSettingsOverlay(false);
+  });
+  elements.settingsOverlay?.addEventListener("click", (event) => {
+    if (event.target === elements.settingsOverlay) {
+      setSettingsOverlay(false);
+    }
+  });
   elements.shortcutsClose.addEventListener("click", () => {
     setShortcutsOverlay(false);
   });
@@ -1230,6 +1546,7 @@ function bindEvents() {
   elements.fontSize.addEventListener("input", handleSettingsChange);
   elements.animationStyle.addEventListener("change", handleSettingsChange);
   elements.animationIntensity.addEventListener("input", handleSettingsChange);
+  elements.showStats?.addEventListener("change", handleSettingsChange);
   elements.leftPage.addEventListener("scroll", () => {
     if (isScrollMode()) {
       updateScrollIndicator();
@@ -1256,73 +1573,87 @@ function bindEvents() {
       return;
     }
 
-    const resolved = resolveReaderKeyAction({
-      key: event.key,
-      altKey: event.altKey,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey,
-      shiftKey: event.shiftKey,
-      isScrollMode: isScrollMode(),
-      shortcutsOpen
-    });
-
-    if (!resolved) {
-      return;
-    }
-
-    event.preventDefault();
-
-    if (resolved.action === "closeShortcuts") {
+    if (event.key === "Escape" && shortcutsOpen) {
+      event.preventDefault();
       setShortcutsOverlay(false);
       return;
     }
 
-    if (resolved.action === "openShortcuts") {
+    if (event.key === "Escape" && settingsOpen) {
+      event.preventDefault();
+      setSettingsOverlay(false);
+      return;
+    }
+
+    if (event.key === "?" || event.key.toLowerCase() === "h") {
+      event.preventDefault();
       setShortcutsOverlay(true);
       return;
     }
 
-    if (resolved.action === "togglePanel") {
+    if (event.key === "Tab") {
+      event.preventDefault();
       toggleSidePanel();
-      return;
     }
 
-    if (resolved.action === "toggleDebug") {
+    if (event.altKey && event.key.toLowerCase() === "d") {
+      event.preventDefault();
       toggleDebugPanel();
-      return;
     }
 
-    if (resolved.action === "nextChapter") {
-      goToChapter(state.currentChapterIndex + 1);
-      return;
-    }
-
-    if (resolved.action === "prevChapter") {
-      goToChapter(state.currentChapterIndex - 1);
-      return;
-    }
-
-    if (resolved.action === "nextPage") {
+    if (event.key === "ArrowRight" || (!isScrollMode() && event.key.toLowerCase() === "j")) {
+      event.preventDefault();
       nextPage();
-      return;
     }
 
-    if (resolved.action === "prevPage") {
+    if (event.key === "ArrowLeft" || (!isScrollMode() && event.key.toLowerCase() === "k")) {
+      event.preventDefault();
       prevPage();
-      return;
     }
 
-    if (resolved.action === "scrollLineDown") {
+    if (isScrollMode() && event.key === "ArrowDown") {
+      event.preventDefault();
       scrollByLine(1);
-      return;
     }
 
-    if (resolved.action === "scrollLineUp") {
+    if (isScrollMode() && event.key === "ArrowUp") {
+      event.preventDefault();
       scrollByLine(-1);
-      return;
     }
 
-    if (resolved.action === "bookmark") {
+    if (event.key === " ") {
+      event.preventDefault();
+      if (isScrollMode()) {
+        handleScrollModeSpace(event.shiftKey ? -1 : 1);
+      } else {
+        if (event.shiftKey) {
+          if (state.currentChapterIndex > 0) {
+            goToChapter(state.currentChapterIndex - 1);
+          }
+        } else {
+          if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
+            goToChapter(state.currentChapterIndex + 1);
+          }
+        }
+      }
+    }
+
+    if (event.key === "[") {
+      event.preventDefault();
+      if (state.currentChapterIndex > 0) {
+        goToChapter(state.currentChapterIndex - 1);
+      }
+    }
+
+    if (event.key === "]") {
+      event.preventDefault();
+      if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
+        goToChapter(state.currentChapterIndex + 1);
+      }
+    }
+
+    if (event.key.toLowerCase() === "b") {
+      event.preventDefault();
       addBookmark();
     }
   });
@@ -1330,19 +1661,9 @@ function bindEvents() {
 }
 
 async function bootstrap() {
-  applyI18n();
-  const syncSupport = getSyncSupportInfo();
-  if (!syncSupport.syncAvailable) {
-    const providerDisplayNames = {
-      chrome: "Chrome",
-      edge: "Microsoft Edge"
-    };
-    const providerName = providerDisplayNames[syncSupport.provider] || "Browser";
-    const params = { provider: providerName };
-    setBackupStatus(
-      t("readerSyncFallbackLocalOnly", params)
-    );
-  }
+  await initializeI18n();
+  refreshI18nUi();
+
   state.settings = await getReaderSettings();
   state.books = await listBooks();
   detectPagesPerView();
@@ -1351,6 +1672,7 @@ async function bootstrap() {
   renderBookmarks();
   renderStats();
   bindEvents();
+  await initializeCloudSection();
   await refreshRecentReads();
 
   if (state.books[0]) {
