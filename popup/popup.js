@@ -1,3 +1,7 @@
+import { applyI18n } from "../modules/i18n.js";
+
+applyI18n();
+
 const openReaderButton = document.getElementById("open-reader");
 
 openReaderButton?.addEventListener("click", async () => {

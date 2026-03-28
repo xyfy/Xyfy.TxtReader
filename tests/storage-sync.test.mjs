@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chooseNewerRecord, normalizeStoredSettings } from "../modules/storage.js";
+import { chooseNewerRecord, detectBrowserProvider, getSyncSupportInfo, normalizeStoredSettings } from "../modules/storage.js";
 
 function run() {
   const normalized = normalizeStoredSettings({ theme: "night" }, 123);
@@ -17,6 +17,32 @@ function run() {
   assert.equal(chooseNewerRecord(localProgress, syncProgress), localProgress);
   assert.equal(chooseNewerRecord(null, syncProgress), syncProgress);
   assert.equal(chooseNewerRecord(localProgress, null), localProgress);
+
+  assert.equal(detectBrowserProvider("Mozilla/5.0 Edg/125.0.0.0"), "edge");
+  assert.equal(detectBrowserProvider("Mozilla/5.0 Chrome/125.0.0.0"), "chrome");
+  assert.equal(detectBrowserProvider("Mozilla/5.0 Safari/605.1.15"), "unknown");
+
+  const originalChrome = globalThis.chrome;
+  try {
+    globalThis.chrome = {
+      storage: {
+        local: {},
+        sync: {}
+      }
+    };
+    const supportAvailable = getSyncSupportInfo();
+    assert.equal(supportAvailable.syncAvailable, true);
+
+    globalThis.chrome = {
+      storage: {
+        local: {}
+      }
+    };
+    const supportUnavailable = getSyncSupportInfo();
+    assert.equal(supportUnavailable.syncAvailable, false);
+  } finally {
+    globalThis.chrome = originalChrome;
+  }
 
   console.log("storage sync tests passed");
 }

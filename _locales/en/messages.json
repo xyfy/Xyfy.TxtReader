@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Xyfy TXT Reader"
+  },
+  "extDescription": {
+    "message": "Local TXT novel reader for Chrome and Edge with book mode, scroll mode, immersive reading, backup, and sync."
+  },
+  "actionOpenReaderTitle": {
+    "message": "Open Xyfy TXT Reader"
+  },
+  "commandOpenReaderDescription": {
+    "message": "Open the TXT reader"
+  }
+}

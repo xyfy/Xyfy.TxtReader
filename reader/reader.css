@@ -200,6 +200,32 @@ body.is-immersive .side-panel {
   flex-wrap: wrap;
 }
 
+.reset-panel {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  display: grid;
+  gap: 8px;
+}
+
+.reset-label {
+  margin-top: 0;
+}
+
+.reset-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted-color);
+}
+
+.reset-option input {
+  margin: 0;
+}
+
 .file-meta,
 .counter {
   margin: 8px 0 0;

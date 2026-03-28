@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "文本阅读器"
+  },
+  "extDescription": {
+    "message": "适用于 Chrome 和 Edge 的本地 TXT 小说阅读器，支持书本模式、滚动模式、沉浸阅读、备份与同步。"
+  },
+  "actionOpenReaderTitle": {
+    "message": "打开文本阅读器"
+  },
+  "commandOpenReaderDescription": {
+    "message": "打开 TXT 阅读器"
+  }
+}
