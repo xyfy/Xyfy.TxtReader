@@ -363,6 +363,24 @@ body.is-immersive .paper-page {
   flex-wrap: wrap;
 }
 
+.inline-language {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-language span {
+  font-size: 13px;
+  color: var(--muted-color);
+}
+
+.inline-language select {
+  width: auto;
+  min-width: 116px;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
 /* ── 书本双页展开 ── */
 .spread-shell {
   display: grid;
@@ -588,6 +606,34 @@ body.is-immersive .paper-page {
   border-color: #7ba8e8;
   outline: none;
   box-shadow: 0 0 0 2px rgba(123, 168, 232, 0.2);
+}
+
+.token-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.token-row .small-button {
+  min-width: 64px;
+  text-align: center;
+}
+
+.cloud-token-note {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cloud-backups-title {
+  margin: 8px 0 4px;
+  font-size: 0.9em;
+}
+
+.cloud-quota {
+  margin-top: 8px;
+  font-size: 0.85em;
 }
 
 #cloud-backups-list {

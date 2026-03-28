@@ -1,5 +1,6 @@
 const LOCALE_ZH = "zh_CN";
 const LOCALE_EN = "en";
+const LOCALE_STORAGE_KEY = "uiLocale";
 
 export const MESSAGES = {
   en: {
@@ -99,9 +100,47 @@ export const MESSAGES = {
     readerResetNothingSelected: "Select at least one reset target",
     readerResetDone: "Reset completed: {targets}",
     readerResetFailed: "Failed to reset selected data",
+    readerLanguageLabel: "Language",
+    readerLanguageZh: "简体中文",
+    readerLanguageEn: "English",
+    readerCloudBackup: "Cloud Backup",
+    readerCloudConnect: "Connect Gist",
+    readerCloudSync: "Sync",
+    readerCloudBackups: "Cloud Backup List",
+    readerCloudStatusHint: "Enter your own Gist ID and Token. Backups are stored in your Gist.",
+    readerCloudGistId: "Gist ID",
+    readerCloudGistIdPlaceholder: "e.g. a1b2c3d4...",
+    readerCloudToken: "Token",
+    readerCloudTokenPlaceholder: "GitHub Personal Access Token",
+    readerCloudToggleTokenShow: "Show",
+    readerCloudToggleTokenHide: "Hide",
+    readerCloudTokenRequirement: "Token must include Gist write permission (classic token: gist, or fine-grained token with gist access).",
+    readerCloudNeedConfig: "Please fill in Gist ID and Token, then click Connect Gist",
+    readerCloudConnecting: "Connecting to {provider}...",
+    readerCloudConnected: "Connected to {provider}. Backups will be stored in your Gist",
+    readerCloudSyncing: "Syncing to cloud...",
+    readerCloudSynced: "Cloud backup updated",
+    readerCloudSyncFailed: "Sync failed: {message}",
+    readerCloudConnectFailed: "Connection failed: {message}",
+    readerCloudSyncFailedShort: "Sync failed",
+    readerCloudConnectFailedShort: "Connection failed",
+    readerCloudDeleteConfirm: "Delete this cloud backup? This cannot be undone.",
+    readerCloudDeleting: "Deleting cloud backup...",
+    readerCloudDeleted: "Cloud backup deleted",
+    readerCloudDeleteFailed: "Delete failed",
+    readerCloudRestoring: "Restoring backup from cloud...",
+    readerCloudRestoreFailed: "Cloud restore failed",
+    readerCloudRestoreDone: "Restore complete: {books} books, {progress} progress items, {bookmarks} bookmarks",
+    readerCloudBackupEmpty: "No cloud backup yet",
+    readerCloudBackupUnnamed: "Unnamed backup",
+    readerCloudQuota: "Cloud usage: {used} / {total}",
+    readerCloudRestore: "Restore",
+    readerCloudDelete: "Delete",
     readerSyncFallbackLocalOnly: "{provider} sync is unavailable. Using local storage only.",
     readerBookmarkLabel: "{chapter} · Page group {page}",
-    readerInitFailed: "Initialization failed. Check the console for details."
+    readerInitFailed: "Initialization failed. Check the console for details.",
+    readerUnknownTime: "Unknown time",
+    readerCloudProviderFallback: "Cloud Service"
   },
   zh_CN: {
     extName: "文本阅读器",
@@ -200,9 +239,47 @@ export const MESSAGES = {
     readerResetNothingSelected: "请至少选择一个重置项",
     readerResetDone: "重置完成：{targets}",
     readerResetFailed: "重置失败",
+    readerLanguageLabel: "语言",
+    readerLanguageZh: "简体中文",
+    readerLanguageEn: "English",
+    readerCloudBackup: "云备份",
+    readerCloudConnect: "连接 Gist",
+    readerCloudSync: "同步",
+    readerCloudBackups: "云备份列表",
+    readerCloudStatusHint: "填写你自己的 Gist ID 和 Token，备份会写入你的 Gist。",
+    readerCloudGistId: "Gist ID",
+    readerCloudGistIdPlaceholder: "例如：a1b2c3d4...",
+    readerCloudToken: "Token",
+    readerCloudTokenPlaceholder: "GitHub Personal Access Token",
+    readerCloudToggleTokenShow: "显示",
+    readerCloudToggleTokenHide: "隐藏",
+    readerCloudTokenRequirement: "Token 需要具备 Gist 写入权限（经典 token 选 gist，或细粒度 token 授予 gist 访问）。",
+    readerCloudNeedConfig: "请填写 Gist ID 和 Token，再点击“连接 Gist”",
+    readerCloudConnecting: "正在连接 {provider}...",
+    readerCloudConnected: "{provider} 连接成功，备份将写入你的 Gist",
+    readerCloudSyncing: "正在同步到云端...",
+    readerCloudSynced: "云端备份已更新",
+    readerCloudSyncFailed: "同步失败：{message}",
+    readerCloudConnectFailed: "连接失败：{message}",
+    readerCloudSyncFailedShort: "同步失败",
+    readerCloudConnectFailedShort: "连接失败",
+    readerCloudDeleteConfirm: "确认删除这条云备份吗？此操作不可撤销。",
+    readerCloudDeleting: "正在删除云端备份...",
+    readerCloudDeleted: "云端备份已删除",
+    readerCloudDeleteFailed: "删除失败",
+    readerCloudRestoring: "正在从云端恢复备份...",
+    readerCloudRestoreFailed: "云端恢复失败",
+    readerCloudRestoreDone: "恢复完成：{books} 本书、{progress} 条进度、{bookmarks} 个书签",
+    readerCloudBackupEmpty: "暂无云端备份",
+    readerCloudBackupUnnamed: "未命名备份",
+    readerCloudQuota: "云空间：{used} / {total}",
+    readerCloudRestore: "恢复",
+    readerCloudDelete: "删除",
     readerSyncFallbackLocalOnly: "{provider} 同步不可用，已仅使用本地存储。",
     readerBookmarkLabel: "{chapter} · 第 {page} 页组",
-    readerInitFailed: "初始化失败，请查看控制台错误。"
+    readerInitFailed: "初始化失败，请查看控制台错误。",
+    readerUnknownTime: "未知时间",
+    readerCloudProviderFallback: "云服务"
   }
 };
 
@@ -211,7 +288,47 @@ function resolveLocale() {
   return uiLanguage.toLowerCase().startsWith("zh") ? LOCALE_ZH : LOCALE_EN;
 }
 
-const currentLocale = resolveLocale();
+function isSupportedLocale(locale) {
+  return locale === LOCALE_ZH || locale === LOCALE_EN;
+}
+
+let currentLocale = resolveLocale();
+
+export function getSupportedLocales() {
+  return [LOCALE_ZH, LOCALE_EN];
+}
+
+export async function initializeI18n() {
+  if (!globalThis.chrome?.storage?.local) {
+    return currentLocale;
+  }
+
+  const savedLocale = await new Promise((resolve) => {
+    chrome.storage.local.get([LOCALE_STORAGE_KEY], (result) => {
+      resolve(result[LOCALE_STORAGE_KEY]);
+    });
+  });
+
+  if (isSupportedLocale(savedLocale)) {
+    currentLocale = savedLocale;
+  }
+
+  return currentLocale;
+}
+
+export async function setLocale(locale) {
+  if (!isSupportedLocale(locale)) {
+    return currentLocale;
+  }
+
+  currentLocale = locale;
+  if (globalThis.chrome?.storage?.local) {
+    await new Promise((resolve) => {
+      chrome.storage.local.set({ [LOCALE_STORAGE_KEY]: locale }, () => resolve());
+    });
+  }
+  return currentLocale;
+}
 
 export function getCurrentLocale() {
   return currentLocale;

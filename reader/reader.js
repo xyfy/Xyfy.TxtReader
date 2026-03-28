@@ -4,6 +4,7 @@ import { parseChapters } from "../modules/chapter-parser.js";
 import { createRenderedChapterPager, paginateChapter } from "../modules/paginator.js";
 import { CloudStorage } from "../modules/cloud-storage.js";
 import { GistProvider } from "../modules/gist-provider.js";
+import { applyI18n, getCurrentLocale, initializeI18n, setLocale, t } from "../modules/i18n.js";
 import {
   deleteBookmark,
   exportBackupSnapshot,
@@ -42,6 +43,7 @@ const state = {
     gistId: "",
     token: ""
   },
+  cloudTokenVisible: false,
   cloudAuthed: false,
   cloudOperationInProgress: false
 };
@@ -56,6 +58,7 @@ const elements = {
   backupStatus: document.getElementById("backup-status"),
   cloudGistId: document.getElementById("cloud-gist-id"),
   cloudGistToken: document.getElementById("cloud-gist-token"),
+  cloudTokenToggle: document.getElementById("cloud-token-toggle"),
   cloudConnect: document.getElementById("cloud-connect"),
   cloudSync: document.getElementById("cloud-sync"),
   cloudStatus: document.getElementById("cloud-status"),
@@ -87,6 +90,7 @@ const elements = {
   fontSize: document.getElementById("font-size"),
   animationStyle: document.getElementById("animation-style"),
   animationIntensity: document.getElementById("animation-intensity"),
+  languageSelect: document.getElementById("language-select"),
   spreadShell: document.querySelector(".spread-shell"),
   appShell: document.querySelector(".app-shell"),
   togglePanel: document.getElementById("toggle-panel"),
@@ -139,20 +143,20 @@ function isScrollMode() {
 
 function updateNavButtonLabels() {
   if (isScrollMode()) {
-    elements.prevPage.textContent = "上滚";
-    elements.nextPage.textContent = "下滚";
+    elements.prevPage.textContent = t("readerScrollUp");
+    elements.nextPage.textContent = t("readerScrollDown");
     return;
   }
 
-  elements.prevPage.textContent = "上一页";
-  elements.nextPage.textContent = "下一页";
+  elements.prevPage.textContent = t("readerPrevPage");
+  elements.nextPage.textContent = t("readerNextPage");
 }
 
 function updateImmersiveButton() {
   elements.immersiveToggle.classList.toggle("active", state.immersiveActive);
   elements.immersiveToggle.setAttribute("aria-pressed", String(state.immersiveActive));
-  elements.immersiveToggle.setAttribute("aria-label", state.immersiveActive ? "退出沉浸模式" : "进入沉浸模式");
-  elements.immersiveToggle.title = state.immersiveActive ? "退出沉浸模式" : "进入沉浸模式";
+  elements.immersiveToggle.setAttribute("aria-label", state.immersiveActive ? t("readerImmersiveExit") : t("readerImmersiveEnter"));
+  elements.immersiveToggle.title = state.immersiveActive ? t("readerImmersiveExit") : t("readerImmersiveEnter");
   elements.immersiveExit.classList.toggle("hidden", !state.immersiveActive);
 }
 
@@ -377,6 +381,35 @@ function setCloudStatus(message, status = "idle", isError = false) {
   elements.cloudStatusBadge.title = message;
 }
 
+function updateTokenVisibility() {
+  if (!elements.cloudGistToken || !elements.cloudTokenToggle) {
+    return;
+  }
+
+  elements.cloudGistToken.type = state.cloudTokenVisible ? "text" : "password";
+  elements.cloudTokenToggle.textContent = state.cloudTokenVisible
+    ? t("readerCloudToggleTokenHide")
+    : t("readerCloudToggleTokenShow");
+}
+
+function refreshI18nUi() {
+  applyI18n();
+
+  if (elements.languageSelect) {
+    elements.languageSelect.value = getCurrentLocale();
+  }
+
+  if (elements.cloudGistId) {
+    elements.cloudGistId.placeholder = t("readerCloudGistIdPlaceholder");
+  }
+  if (elements.cloudGistToken) {
+    elements.cloudGistToken.placeholder = t("readerCloudTokenPlaceholder");
+  }
+
+  updateTokenVisibility();
+  updateNavButtonLabels();
+}
+
 const GIST_CONFIG_KEY = "gistCloudConfig";
 
 function loadGistConfig() {
@@ -409,13 +442,14 @@ function saveGistConfig(config) {
 
 function formatCloudTime(isoString) {
   if (!isoString) {
-    return "未知时间";
+    return t("readerUnknownTime");
   }
   const date = new Date(isoString);
   if (Number.isNaN(date.getTime())) {
-    return "未知时间";
+    return t("readerUnknownTime");
   }
-  return date.toLocaleString("zh-CN", { hour12: false });
+  const locale = getCurrentLocale() === "zh_CN" ? "zh-CN" : "en-US";
+  return date.toLocaleString(locale, { hour12: false });
 }
 
 async function handleCloudRestore(fileId) {
@@ -424,12 +458,12 @@ async function handleCloudRestore(fileId) {
   }
 
   setCloudActionBusy(true);
-  setCloudStatus("正在从云端恢复备份...", "connected");
+  setCloudStatus(t("readerCloudRestoring"), "connected");
 
   try {
     const restoreResult = await state.cloudProvider.restoreFromCloud(fileId);
     if (!restoreResult.success) {
-      throw restoreResult.error || new Error("云端恢复失败");
+      throw restoreResult.error || new Error(t("readerCloudRestoreFailed"));
     }
 
     const payload = parseBackupPayload(JSON.stringify(restoreResult.data));
@@ -453,11 +487,15 @@ async function handleCloudRestore(fileId) {
     }
 
     setCloudStatus(
-      `恢复完成：${importResult.booksImported} 本书、${importResult.progressImported} 条进度、${importResult.bookmarksImported} 个书签`,
+      t("readerCloudRestoreDone", {
+        books: importResult.booksImported,
+        progress: importResult.progressImported,
+        bookmarks: importResult.bookmarksImported
+      }),
       "connected"
     );
   } catch (error) {
-    setCloudStatus(error instanceof Error ? error.message : "云端恢复失败", "error", true);
+    setCloudStatus(error instanceof Error ? error.message : t("readerCloudRestoreFailed"), "error", true);
   } finally {
     setCloudActionBusy(false);
   }
@@ -468,23 +506,23 @@ async function handleCloudDelete(fileId) {
     return;
   }
 
-  const confirmed = window.confirm("确认删除这条云备份吗？此操作不可撤销。");
+  const confirmed = window.confirm(t("readerCloudDeleteConfirm"));
   if (!confirmed) {
     return;
   }
 
   setCloudActionBusy(true);
-  setCloudStatus("正在删除云端备份...", "connected");
+  setCloudStatus(t("readerCloudDeleting"), "connected");
 
   try {
     const result = await state.cloudProvider.deleteCloudBackup(fileId);
     if (!result.success) {
-      throw result.error || new Error("删除失败");
+      throw result.error || new Error(t("readerCloudDeleteFailed"));
     }
-    setCloudStatus("云端备份已删除", "connected");
+    setCloudStatus(t("readerCloudDeleted"), "connected");
     await refreshCloudBackups();
   } catch (error) {
-    setCloudStatus(error instanceof Error ? error.message : "删除失败", "error", true);
+    setCloudStatus(error instanceof Error ? error.message : t("readerCloudDeleteFailed"), "error", true);
   } finally {
     setCloudActionBusy(false);
   }
@@ -495,7 +533,7 @@ function renderCloudBackups(backups) {
   if (!Array.isArray(backups) || backups.length === 0) {
     const empty = document.createElement("p");
     empty.className = "file-meta";
-    empty.textContent = "暂无云端备份";
+    empty.textContent = t("readerCloudBackupEmpty");
     elements.cloudBackupsList.append(empty);
     return;
   }
@@ -509,7 +547,7 @@ function renderCloudBackups(backups) {
 
     const name = document.createElement("div");
     name.className = "backup-name";
-    name.textContent = backup.fileName || "未命名备份";
+    name.textContent = backup.fileName || t("readerCloudBackupUnnamed");
 
     const time = document.createElement("div");
     time.className = "backup-time";
@@ -522,14 +560,14 @@ function renderCloudBackups(backups) {
 
     const restoreButton = document.createElement("button");
     restoreButton.type = "button";
-    restoreButton.textContent = "恢复";
+    restoreButton.textContent = t("readerCloudRestore");
     restoreButton.addEventListener("click", () => {
       handleCloudRestore(backup.fileId);
     });
 
     const removeButton = document.createElement("button");
     removeButton.type = "button";
-    removeButton.textContent = "删除";
+    removeButton.textContent = t("readerCloudDelete");
     removeButton.addEventListener("click", () => {
       handleCloudDelete(backup.fileId);
     });
@@ -558,7 +596,10 @@ async function refreshCloudBackups() {
 
   if (quotaResult.success && quotaResult.data) {
     const quota = quotaResult.data;
-    elements.cloudQuota.textContent = `云空间：${formatSize(Number(quota.usedBytes || 0))} / ${formatSize(Number(quota.totalBytes || 0))}`;
+    elements.cloudQuota.textContent = t("readerCloudQuota", {
+      used: formatSize(Number(quota.usedBytes || 0)),
+      total: formatSize(Number(quota.totalBytes || 0))
+    });
   } else {
     elements.cloudQuota.textContent = "";
   }
@@ -581,7 +622,7 @@ async function initializeCloudSection() {
 
   const provider = new GistProvider(state.cloudConfig);
   const providerMeta = provider.getMetadata();
-  state.cloudProviderName = providerMeta.name || "云服务";
+  state.cloudProviderName = providerMeta.name || t("readerCloudProviderFallback");
 
   state.cloudProvider = new CloudStorage({
     provider
@@ -589,7 +630,7 @@ async function initializeCloudSection() {
 
   const initResult = await state.cloudProvider.initialize();
   if (!initResult.success) {
-    setCloudStatus(`${state.cloudProviderName} 初始化失败`, "error", true);
+    setCloudStatus(`${state.cloudProviderName} ${t("readerInitFailed")}`, "error", true);
     setCloudActionBusy(false);
     return;
   }
@@ -598,11 +639,11 @@ async function initializeCloudSection() {
   state.cloudAuthed = ready;
 
   if (ready) {
-    setCloudStatus(`已连接 ${state.cloudProviderName}（使用你的 Gist 存储）`, "connected");
+    setCloudStatus(t("readerCloudConnected", { provider: state.cloudProviderName }), "connected");
     elements.cloudBackupsContainer.classList.remove("hidden");
     await refreshCloudBackups();
   } else {
-    setCloudStatus("请填写 Gist ID 和 Token，再点击“连接 Gist”", "needs-auth");
+    setCloudStatus(t("readerCloudNeedConfig"), "needs-auth");
     elements.cloudBackupsContainer.classList.add("hidden");
   }
 
@@ -615,14 +656,14 @@ async function handleCloudConnect() {
   }
 
   setCloudActionBusy(true);
-  setCloudStatus(`正在连接 ${state.cloudProviderName}...`, "needs-auth");
+  setCloudStatus(t("readerCloudConnecting", { provider: state.cloudProviderName }), "needs-auth");
 
   try {
     const gistId = elements.cloudGistId?.value?.trim() || "";
     const token = elements.cloudGistToken?.value?.trim() || "";
 
     if (!gistId || !token) {
-      throw new Error("请填写 Gist ID 和 Token");
+      throw new Error(t("readerCloudNeedConfig"));
     }
 
     const result = await state.cloudProvider.requestCloudAuth({ gistId, token });
@@ -630,17 +671,17 @@ async function handleCloudConnect() {
       state.cloudAuthed = true;
       state.cloudConfig = { gistId, token };
       await saveGistConfig(state.cloudConfig);
-      setCloudStatus(`${state.cloudProviderName} 连接成功，备份将写入你的 Gist`, "connected");
+      setCloudStatus(t("readerCloudConnected", { provider: state.cloudProviderName }), "connected");
       elements.cloudBackupsContainer.classList.remove("hidden");
       await refreshCloudBackups();
     } else {
       state.cloudAuthed = false;
-      const message = result.error?.message || "连接失败";
-      setCloudStatus(`连接失败：${message}`, "error", true);
+      const message = result.error?.message || t("readerCloudConnectFailedShort");
+      setCloudStatus(t("readerCloudConnectFailed", { message }), "error", true);
     }
   } catch (error) {
     state.cloudAuthed = false;
-    setCloudStatus(error instanceof Error ? error.message : "连接失败", "error", true);
+    setCloudStatus(error instanceof Error ? error.message : t("readerCloudConnectFailed", { message: "" }), "error", true);
   } finally {
     setCloudActionBusy(false);
   }
@@ -652,7 +693,7 @@ async function handleCloudSync() {
   }
 
   setCloudActionBusy(true);
-  setCloudStatus("正在同步到云端...", "connected");
+  setCloudStatus(t("readerCloudSyncing"), "connected");
 
   try {
     const snapshot = await exportBackupSnapshot();
@@ -662,15 +703,15 @@ async function handleCloudSync() {
     });
 
     if (result.success) {
-      setCloudStatus("云端备份已更新", "connected");
+      setCloudStatus(t("readerCloudSynced"), "connected");
       elements.cloudBackupsContainer.classList.remove("hidden");
       await refreshCloudBackups();
     } else {
-      const message = result.error?.message || "同步失败";
-      setCloudStatus(`同步失败：${message}`, "error", true);
+      const message = result.error?.message || t("readerCloudSyncFailedShort");
+      setCloudStatus(t("readerCloudSyncFailed", { message }), "error", true);
     }
   } catch (error) {
-    setCloudStatus(error instanceof Error ? error.message : "同步失败", "error", true);
+    setCloudStatus(error instanceof Error ? error.message : t("readerCloudSyncFailed", { message: "" }), "error", true);
   } finally {
     setCloudActionBusy(false);
   }
@@ -688,7 +729,7 @@ async function refreshRecentReads() {
   if (!recentEntries.length) {
     const empty = document.createElement("p");
     empty.className = "file-meta";
-    empty.textContent = "还没有最近阅读记录";
+    empty.textContent = t("readerRecentEmpty");
     elements.recentList.append(empty);
     return;
   }
@@ -697,7 +738,10 @@ async function refreshRecentReads() {
     const book = bookMap.get(entry.bookId);
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `${book?.name || entry.bookId} · 第 ${Number(entry.chapterIndex || 0) + 1} 章`;
+    button.textContent = t("readerRecentChapterItem", {
+      name: book?.name || entry.bookId,
+      chapter: Number(entry.chapterIndex || 0) + 1
+    });
     if (state.book?.id === entry.bookId) {
       button.classList.add("active");
     }
@@ -719,12 +763,15 @@ function renderStats() {
     ? elements.pageIndicator.textContent || "0%"
     : `${Math.floor(state.currentPageIndex / Math.max(1, state.pagesPerView)) + 1} / ${Math.max(1, Math.ceil(state.pages.length / Math.max(1, state.pagesPerView)))}`;
 
-  stats.push(["模式", isScrollMode() ? "单页滚动" : state.pagesPerView === 2 ? "书本双页" : "书本单页"]);
-  stats.push(["章节", chapterProgress]);
-  stats.push(["页进度", pageProgress]);
-  stats.push(["本章字数", chapterChars ? `${chapterChars.toLocaleString()} 字` : "-"]);
-  stats.push(["全书字数", totalChars ? `${totalChars.toLocaleString()} 字` : "-"]);
-  stats.push(["书签数", `${state.bookmarks.length}`]);
+  stats.push([
+    t("readerStatsMode"),
+    isScrollMode() ? t("readerStatsModeScroll") : state.pagesPerView === 2 ? t("readerStatsModeBookDouble") : t("readerStatsModeBookSingle")
+  ]);
+  stats.push([t("readerStatsChapter"), chapterProgress]);
+  stats.push([t("readerStatsPageProgress"), pageProgress]);
+  stats.push([t("readerStatsChapterChars"), chapterChars ? t("readerCharsUnit", { count: chapterChars.toLocaleString() }) : "-"]);
+  stats.push([t("readerStatsTotalChars"), totalChars ? t("readerCharsUnit", { count: totalChars.toLocaleString() }) : "-"]);
+  stats.push([t("readerStatsBookmarkCount"), `${state.bookmarks.length}`]);
 
   elements.statsList.innerHTML = "";
   for (const [label, value] of stats) {
@@ -750,7 +797,7 @@ function renderLibrary() {
   if (!state.books.length) {
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "暂无已保存书籍";
+    option.textContent = t("readerLibraryEmpty");
     elements.librarySelect.append(option);
     return;
   }
@@ -758,7 +805,7 @@ function renderLibrary() {
   for (const book of state.books) {
     const option = document.createElement("option");
     option.value = book.id;
-    option.textContent = `${book.name} · ${book.chapterCount}章`;
+    option.textContent = t("readerLibraryItem", { name: book.name, count: book.chapterCount });
     if (state.book && state.book.id === book.id) {
       option.selected = true;
     }
@@ -789,7 +836,7 @@ function renderBookmarks() {
   if (!state.bookmarks.length) {
     const empty = document.createElement("p");
     empty.className = "file-meta";
-    empty.textContent = "当前书籍还没有书签";
+    empty.textContent = t("readerBookmarksEmpty");
     elements.bookmarkList.append(empty);
     return;
   }
@@ -810,7 +857,7 @@ function renderBookmarks() {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "small-button";
-    remove.textContent = "删除";
+    remove.textContent = t("readerDelete");
     remove.addEventListener("click", async () => {
       await deleteBookmark(bookmark.id);
       await refreshBookmarks();
@@ -857,12 +904,12 @@ function updateScrollIndicator() {
   }
 
   if (isAtScrollBoundary(1)) {
-    showModeHint("已到底，按右方向键或空格切下一章", 1200);
+    showModeHint(t("readerHintBottomNextChapter"), 1200);
     return;
   }
 
   if (isAtScrollBoundary(-1)) {
-    showModeHint("已到顶，按左方向键或 Shift+空格回上一章", 1200);
+    showModeHint(t("readerHintTopPrevChapter"), 1200);
     return;
   }
 
@@ -898,7 +945,7 @@ function isAtScrollBoundary(direction) {
 function handleScrollModeSpace(direction) {
   if (direction > 0 && isAtScrollBoundary(1)) {
     if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
-      showModeHint("切换到下一章", 700);
+      showModeHint(t("readerHintNextChapter"), 700);
       goToChapter(state.currentChapterIndex + 1);
     }
     return;
@@ -906,7 +953,7 @@ function handleScrollModeSpace(direction) {
 
   if (direction < 0 && isAtScrollBoundary(-1)) {
     if (state.currentChapterIndex > 0) {
-      showModeHint("切换到上一章", 700);
+      showModeHint(t("readerHintPrevChapter"), 700);
       goToChapter(state.currentChapterIndex - 1);
     }
     return;
@@ -936,8 +983,8 @@ function renderSpread() {
   elements.bookTitle.textContent = state.book?.name || "Xyfy TXT Reader";
   elements.leftTitle.textContent = chapter?.title || "";
   elements.rightTitle.textContent = chapter?.title || "";
-  elements.leftPage.textContent = left || "当前页没有内容";
-  elements.rightPage.textContent = right || "已经到本章末尾";
+  elements.leftPage.textContent = left || t("readerCurrentPageEmpty");
+  elements.rightPage.textContent = right || t("readerChapterEnd");
   elements.leftPage.classList.toggle("empty", !left);
   elements.rightPage.classList.toggle("empty", !right && state.pagesPerView === 2);
   if (isScrollMode()) {
@@ -1228,7 +1275,13 @@ async function handleExportBackup() {
   link.download = createBackupFilename();
   link.click();
   URL.revokeObjectURL(url);
-  setBackupStatus(`已导出 ${payload.books.length} 本书、${payload.progress.length} 条进度、${payload.bookmarks.length} 个书签`);
+  setBackupStatus(
+    t("readerBackupExported", {
+      books: payload.books.length,
+      progress: payload.progress.length,
+      bookmarks: payload.bookmarks.length
+    })
+  );
 }
 
 async function handleImportBackup(event) {
@@ -1260,11 +1313,15 @@ async function handleImportBackup(event) {
     }
 
     setBackupStatus(
-      `已恢复 ${result.booksImported} 本书、${result.progressImported} 条进度、${result.bookmarksImported} 个书签`
+      t("readerBackupImported", {
+        books: result.booksImported,
+        progress: result.progressImported,
+        bookmarks: result.bookmarksImported
+      })
     );
   } catch (error) {
     console.error(error);
-    setBackupStatus(error instanceof Error ? error.message : "恢复备份失败", true);
+    setBackupStatus(error instanceof Error ? error.message : t("readerBackupImportFailed"), true);
   } finally {
     event.target.value = "";
   }
@@ -1332,7 +1389,10 @@ async function addBookmark() {
   }
 
   const chapter = state.book.chapters[state.currentChapterIndex];
-  const label = `${chapter.title} · 第 ${Math.floor(state.currentPageIndex / state.pagesPerView) + 1} 页组`;
+  const label = t("readerBookmarkLabel", {
+    chapter: chapter.title,
+    page: Math.floor(state.currentPageIndex / state.pagesPerView) + 1
+  });
   await saveBookmark({
     id: `${state.book.id}:${state.currentChapterIndex}:${state.currentPageIndex}`,
     bookId: state.book.id,
@@ -1395,6 +1455,21 @@ function bindEvents() {
   });
   elements.cloudSync?.addEventListener("click", () => {
     handleCloudSync();
+  });
+  elements.cloudTokenToggle?.addEventListener("click", () => {
+    state.cloudTokenVisible = !state.cloudTokenVisible;
+    updateTokenVisibility();
+  });
+  elements.languageSelect?.addEventListener("change", async (event) => {
+    const nextLocale = event.target.value;
+    await setLocale(nextLocale);
+    refreshI18nUi();
+    renderLibrary();
+    renderBookmarks();
+    renderStats();
+    renderToc();
+    renderSpread();
+    await refreshRecentReads();
   });
   elements.librarySelect.addEventListener("change", (event) => {
     if (event.target.value) {
@@ -1547,6 +1622,9 @@ function bindEvents() {
 }
 
 async function bootstrap() {
+  await initializeI18n();
+  refreshI18nUi();
+
   state.settings = await getReaderSettings();
   state.books = await listBooks();
   detectPagesPerView();
@@ -1565,5 +1643,5 @@ async function bootstrap() {
 
 bootstrap().catch((error) => {
   console.error(error);
-  elements.fileMeta.textContent = "初始化失败，请查看控制台错误。";
+  elements.fileMeta.textContent = t("readerInitFailed");
 });
