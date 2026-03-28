@@ -6,12 +6,17 @@
   "scripts": {
     "build:zip": "rm -f dist/xyfy-txt-reader-v$npm_package_version.zip && mkdir -p dist && zip -r dist/xyfy-txt-reader-v$npm_package_version.zip manifest.json _locales background modules popup reader icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png",
     "gen:icons": "node scripts/gen-icons.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "npm run test:paginator && npm run test:backup && npm run test:storage-sync",
     "test:paginator": "node tests/paginator.test.mjs",
     "test:backup": "node tests/backup.test.mjs",
     "test:storage-sync": "node tests/storage-sync.test.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "globals": "^17.4.0",
     "sharp": "^0.34.5"
   }
 }
