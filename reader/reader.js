@@ -16,6 +16,7 @@ import {
   listAllProgress,
   listBookmarks,
   listBooks,
+  resetReaderData,
   saveBook,
   saveBookmark,
   saveProgress,
@@ -66,6 +67,12 @@ const elements = {
   cloudBackupsContainer: document.getElementById("cloud-backups-container"),
   cloudBackupsList: document.getElementById("cloud-backups-list"),
   cloudQuota: document.getElementById("cloud-quota"),
+  closeCurrentBook: document.getElementById("close-current-book"),
+  resetData: document.getElementById("reset-data"),
+  resetTargetSettings: document.getElementById("reset-target-settings"),
+  resetTargetProgress: document.getElementById("reset-target-progress"),
+  resetTargetBookmarks: document.getElementById("reset-target-bookmarks"),
+  resetTargetBooks: document.getElementById("reset-target-books"),
   librarySelect: document.getElementById("library-select"),
   recentList: document.getElementById("recent-list"),
   statsList: document.getElementById("stats-list"),
@@ -378,6 +385,158 @@ function schedulePaginationWarmup() {
 function setBackupStatus(message, isError = false) {
   elements.backupStatus.textContent = message;
   elements.backupStatus.style.color = isError ? "#b5442a" : "";
+}
+
+function formatTargetList(targets) {
+  if (!Array.isArray(targets) || targets.length === 0) {
+    return "";
+  }
+
+  const locale = getCurrentLocale() === "zh_CN" ? "zh-CN" : "en";
+  if (typeof Intl !== "undefined" && typeof Intl.ListFormat === "function") {
+    return new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(targets);
+  }
+
+  return targets.join(locale.startsWith("zh") ? "、" : ", ");
+}
+
+async function closeCurrentBookState({
+  refreshLibrary = true,
+  refreshRecentReadsList = true,
+  resetFileMeta = true
+} = {}) {
+  cancelPaginationWarmup();
+  clearActivePaginationSession();
+
+  state.book = null;
+  state.bookmarks = [];
+  state.pages = [];
+  state.currentChapterIndex = 0;
+  state.currentPageIndex = 0;
+
+  if (resetFileMeta) {
+    elements.fileMeta.textContent = t("readerNoFile");
+  }
+
+  if (refreshLibrary) {
+    renderLibrary();
+  }
+
+  renderBookmarks();
+  renderToc();
+  renderSpread();
+
+  if (refreshRecentReadsList) {
+    await refreshRecentReads();
+  }
+}
+
+async function handleCloseCurrentBook() {
+  if (!state.book) {
+    setBackupStatus(t("readerCloseCurrentBookNoActive"), true);
+    return;
+  }
+
+  const confirmed = window.confirm(t("readerCloseCurrentBookConfirm"));
+  if (!confirmed) {
+    return;
+  }
+
+  await closeCurrentBookState();
+  setBackupStatus(t("readerCloseCurrentBookDone"));
+}
+
+function getResetOptionsAndLabels() {
+  const targetDefinitions = [
+    {
+      key: "settings",
+      checked: Boolean(elements.resetTargetSettings?.checked),
+      label: t("readerResetTargetSettings")
+    },
+    {
+      key: "progress",
+      checked: Boolean(elements.resetTargetProgress?.checked),
+      label: t("readerResetTargetProgress")
+    },
+    {
+      key: "bookmarks",
+      checked: Boolean(elements.resetTargetBookmarks?.checked),
+      label: t("readerResetTargetBookmarks")
+    },
+    {
+      key: "books",
+      checked: Boolean(elements.resetTargetBooks?.checked),
+      label: t("readerResetTargetBooks")
+    }
+  ];
+
+  const options = {
+    settings: targetDefinitions[0].checked,
+    progress: targetDefinitions[1].checked,
+    bookmarks: targetDefinitions[2].checked,
+    books: targetDefinitions[3].checked
+  };
+
+  const labels = targetDefinitions.filter((item) => item.checked).map((item) => item.label);
+
+  return { options, labels };
+}
+
+async function handleResetData() {
+  const { options, labels } = getResetOptionsAndLabels();
+  if (!labels.length) {
+    setBackupStatus(t("readerResetNothingSelected"), true);
+    return;
+  }
+
+  const targetsText = formatTargetList(labels);
+  const confirmed = window.confirm(t("readerResetConfirm", { targets: targetsText }));
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await resetReaderData(options);
+    state.chapterPageCache.clear();
+
+    if (options.settings) {
+      state.settings = await getReaderSettings();
+      applySettings();
+      detectPagesPerView();
+    }
+
+    if (options.books) {
+      state.books = await listBooks();
+      await closeCurrentBookState({
+        refreshLibrary: false,
+        refreshRecentReadsList: false,
+        resetFileMeta: true
+      });
+      renderLibrary();
+      await refreshRecentReads();
+      setBackupStatus(t("readerResetDone", { targets: targetsText }));
+      return;
+    }
+
+    if (options.progress && state.book) {
+      state.currentChapterIndex = 0;
+      state.currentPageIndex = 0;
+      rebuildPages();
+    }
+
+    if (options.bookmarks) {
+      await refreshBookmarks();
+    }
+
+    if (options.progress || options.bookmarks) {
+      await refreshRecentReads();
+    }
+
+    setBackupStatus(t("readerResetDone", { targets: targetsText }));
+  } catch (error) {
+    console.error(error);
+    setBackupStatus(error instanceof Error ? error.message : t("readerResetFailed"), true);
+  }
 }
 
 function setCloudStatus(message, status = "idle", isError = false) {
@@ -827,6 +986,10 @@ function renderLibrary() {
     }
     elements.librarySelect.append(option);
   }
+
+  if (!state.book) {
+    elements.librarySelect.selectedIndex = -1;
+  }
 }
 
 function renderToc() {
@@ -1247,6 +1410,11 @@ async function refreshBookmarks() {
 async function loadBook(bookId) {
   const book = await getBook(bookId);
   if (!book) {
+    await closeCurrentBookState({
+      refreshLibrary: true,
+      refreshRecentReadsList: true,
+      resetFileMeta: true
+    });
     return;
   }
 
@@ -1471,6 +1639,12 @@ function bindEvents() {
     handleExportBackup();
   });
   elements.importBackup.addEventListener("change", handleImportBackup);
+  elements.resetData?.addEventListener("click", () => {
+    handleResetData();
+  });
+  elements.closeCurrentBook?.addEventListener("click", () => {
+    handleCloseCurrentBook();
+  });
   elements.cloudConnect?.addEventListener("click", () => {
     handleCloudConnect();
   });
@@ -1601,14 +1775,18 @@ function bindEvents() {
       toggleDebugPanel();
     }
 
-    if (event.key === "ArrowRight" || (!isScrollMode() && event.key.toLowerCase() === "j")) {
+    if (event.key === "ArrowRight") {
       event.preventDefault();
-      nextPage();
+      if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
+        goToChapter(state.currentChapterIndex + 1);
+      }
     }
 
-    if (event.key === "ArrowLeft" || (!isScrollMode() && event.key.toLowerCase() === "k")) {
+    if (event.key === "ArrowLeft") {
       event.preventDefault();
-      prevPage();
+      if (state.currentChapterIndex > 0) {
+        goToChapter(state.currentChapterIndex - 1);
+      }
     }
 
     if (isScrollMode() && event.key === "ArrowDown") {
@@ -1627,13 +1805,9 @@ function bindEvents() {
         handleScrollModeSpace(event.shiftKey ? -1 : 1);
       } else {
         if (event.shiftKey) {
-          if (state.currentChapterIndex > 0) {
-            goToChapter(state.currentChapterIndex - 1);
-          }
+          prevPage();
         } else {
-          if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
-            goToChapter(state.currentChapterIndex + 1);
-          }
+          nextPage();
         }
       }
     }

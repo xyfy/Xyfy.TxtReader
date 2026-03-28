@@ -200,6 +200,14 @@ body.is-immersive .side-panel {
   flex-wrap: wrap;
 }
 
+.library-actions {
+  margin-top: 8px;
+}
+
+#close-current-book {
+  width: 100%;
+}
+
 .reset-panel {
   margin-top: 12px;
   padding: 10px;
