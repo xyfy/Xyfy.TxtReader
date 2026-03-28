@@ -136,6 +136,7 @@ async function testResetCanClearBooksOnly() {
 
   assert.equal(result.booksCleared, true);
   assert.equal(result.settingsReset, false);
+  assert.equal(result.syncUsed, false);
 
   const settings = await getReaderSettings();
   const books = await listBooks();

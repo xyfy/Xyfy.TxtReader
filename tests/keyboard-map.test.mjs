@@ -4,6 +4,9 @@ import { resolveReaderKeyAction } from "../modules/keyboard-map.js";
 function run() {
   assert.equal(resolveReaderKeyAction({ key: "ArrowRight" }).action, "nextChapter");
   assert.equal(resolveReaderKeyAction({ key: "ArrowLeft" }).action, "prevChapter");
+  assert.equal(resolveReaderKeyAction({ key: "ArrowLeft", altKey: true }), null);
+  assert.equal(resolveReaderKeyAction({ key: "ArrowRight", ctrlKey: true }), null);
+  assert.equal(resolveReaderKeyAction({ key: "ArrowLeft", metaKey: true }), null);
 
   assert.equal(resolveReaderKeyAction({ key: " ", shiftKey: false }).action, "nextPage");
   assert.equal(resolveReaderKeyAction({ key: " ", shiftKey: true }).action, "prevPage");

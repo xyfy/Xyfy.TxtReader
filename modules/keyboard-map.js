@@ -1,4 +1,12 @@
-export function resolveReaderKeyAction({ key, altKey = false, shiftKey = false, isScrollMode = false, shortcutsOpen = false }) {
+export function resolveReaderKeyAction({
+  key,
+  altKey = false,
+  shiftKey = false,
+  ctrlKey = false,
+  metaKey = false,
+  isScrollMode = false,
+  shortcutsOpen = false
+}) {
   if (!key) {
     return null;
   }
@@ -21,11 +29,13 @@ export function resolveReaderKeyAction({ key, altKey = false, shiftKey = false, 
     return { action: "toggleDebug" };
   }
 
-  if (key === "ArrowRight") {
+  const hasModifier = altKey || ctrlKey || metaKey || shiftKey;
+
+  if (key === "ArrowRight" && !hasModifier) {
     return { action: "nextChapter" };
   }
 
-  if (key === "ArrowLeft") {
+  if (key === "ArrowLeft" && !hasModifier) {
     return { action: "prevChapter" };
   }
 

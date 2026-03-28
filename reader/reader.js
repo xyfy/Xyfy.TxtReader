@@ -1259,6 +1259,8 @@ function bindEvents() {
     const resolved = resolveReaderKeyAction({
       key: event.key,
       altKey: event.altKey,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
       shiftKey: event.shiftKey,
       isScrollMode: isScrollMode(),
       shortcutsOpen
@@ -1335,8 +1337,8 @@ async function bootstrap() {
       chrome: "Chrome",
       edge: "Microsoft Edge"
     };
-    const providerName = providerDisplayNames[syncSupport.provider];
-    const params = providerName ? { provider: providerName } : {};
+    const providerName = providerDisplayNames[syncSupport.provider] || "Browser";
+    const params = { provider: providerName };
     setBackupStatus(
       t("readerSyncFallbackLocalOnly", params)
     );

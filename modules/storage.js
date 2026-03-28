@@ -249,6 +249,7 @@ export async function resetReaderData(options = {}) {
   const progressCleared = Boolean(progress);
   const bookmarksCleared = Boolean(bookmarks);
   const booksCleared = Boolean(books);
+  const syncUsed = Boolean(sync && ((settings && area) || progress));
 
   if (settings && area) {
     const defaultSettings = normalizeStoredSettings(DEFAULT_SETTINGS, Date.now());
@@ -290,7 +291,7 @@ export async function resetReaderData(options = {}) {
     progressCleared,
     bookmarksCleared,
     booksCleared,
-    syncUsed: Boolean(sync)
+    syncUsed
   };
 }
 
