@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "default_locale": "zh_CN",
   "name": "Xyfy TXT Reader",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Local TXT novel reader for Chrome and Edge with book mode, scroll mode, immersive reading, backup, and sync.",
   "permissions": ["storage"],
   "host_permissions": ["https://api.github.com/*"],
