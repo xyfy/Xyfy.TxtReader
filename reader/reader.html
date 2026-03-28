@@ -58,6 +58,26 @@
             </label>
           </div>
           <p id="backup-status" class="file-meta" data-i18n="readerBackupHint">Export or restore books, progress, bookmarks, and reading settings</p>
+          <div class="reset-panel">
+            <p class="file-meta reset-label" data-i18n="readerResetTitle">Reset data</p>
+            <label class="reset-option">
+              <input id="reset-target-settings" type="checkbox" checked />
+              <span data-i18n="readerResetTargetSettings">Reading settings</span>
+            </label>
+            <label class="reset-option">
+              <input id="reset-target-progress" type="checkbox" checked />
+              <span data-i18n="readerResetTargetProgress">Reading progress</span>
+            </label>
+            <label class="reset-option">
+              <input id="reset-target-bookmarks" type="checkbox" checked />
+              <span data-i18n="readerResetTargetBookmarks">Bookmarks</span>
+            </label>
+            <label class="reset-option">
+              <input id="reset-target-books" type="checkbox" />
+              <span data-i18n="readerResetTargetBooks">Imported books</span>
+            </label>
+            <button id="reset-settings" type="button" data-i18n="readerResetAction">Reset selected items</button>
+          </div>
         </section>
 
         <section class="panel-block">
@@ -155,9 +175,9 @@
               <button id="shortcuts-close" class="small-button" type="button" data-i18n="readerShortcutsClose">Close</button>
             </div>
             <div class="shortcut-grid">
-              <div><strong>← / →</strong><span data-i18n="readerShortcutsDescArrows">Turn pages; keep pressing at the boundary to switch chapters</span></div>
-              <div><strong>Space</strong><span data-i18n="readerShortcutsDescSpace">Next chapter in book mode; scroll one screen in scrolling mode</span></div>
-              <div><strong>Shift + Space</strong><span data-i18n="readerShortcutsDescShiftSpace">Scroll one screen up or go to previous chapter in scrolling mode</span></div>
+              <div><strong>← / →</strong><span data-i18n="readerShortcutsDescArrows">Switch chapters</span></div>
+              <div><strong>Space</strong><span data-i18n="readerShortcutsDescSpace">Next page (or next chapter at page boundary)</span></div>
+              <div><strong>Shift + Space</strong><span data-i18n="readerShortcutsDescShiftSpace">Previous page (or previous chapter at page boundary)</span></div>
               <div><strong>↑ / ↓</strong><span data-i18n="readerShortcutsDescVertical">Scroll by small steps in scrolling mode</span></div>
               <div><strong>B</strong><span data-i18n="readerShortcutsDescBookmark">Add a bookmark for the current location</span></div>
               <div><strong>Tab</strong><span data-i18n="readerShortcutsDescSidebar">Show or hide the sidebar</span></div>

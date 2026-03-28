@@ -3,6 +3,7 @@ import { createBackupFilename, createBackupPayload, parseBackupPayload } from ".
 import { parseChapters } from "../modules/chapter-parser.js";
 import { createRenderedChapterPager, paginateChapter } from "../modules/paginator.js";
 import { applyI18n, getDocumentLanguage, t } from "../modules/i18n.js";
+import { resolveReaderKeyAction } from "../modules/keyboard-map.js";
 import {
   deleteBookmark,
   exportBackupSnapshot,
@@ -10,10 +11,12 @@ import {
   getDefaultSettings,
   getProgress,
   getReaderSettings,
+  getSyncSupportInfo,
   importBackupSnapshot,
   listAllProgress,
   listBookmarks,
   listBooks,
+  resetReaderData,
   saveBook,
   saveBookmark,
   saveProgress,
@@ -45,6 +48,11 @@ const elements = {
   exportBackup: document.getElementById("export-backup"),
   importBackup: document.getElementById("import-backup"),
   backupStatus: document.getElementById("backup-status"),
+  resetSettings: document.getElementById("reset-settings"),
+  resetSettingsInput: document.getElementById("reset-target-settings"),
+  resetProgressInput: document.getElementById("reset-target-progress"),
+  resetBookmarksInput: document.getElementById("reset-target-bookmarks"),
+  resetBooksInput: document.getElementById("reset-target-books"),
   librarySelect: document.getElementById("library-select"),
   recentList: document.getElementById("recent-list"),
   statsList: document.getElementById("stats-list"),
@@ -960,6 +968,10 @@ async function handleImportBackup(event) {
 }
 
 function goToChapter(index) {
+  if (!state.book || index < 0 || index >= state.book.chapters.length) {
+    return;
+  }
+
   state.currentChapterIndex = index;
   state.currentPageIndex = 0;
   rebuildPages();
@@ -986,6 +998,94 @@ function nextPage() {
 
   if (state.currentChapterIndex + 1 < state.book.chapters.length) {
     goToChapter(state.currentChapterIndex + 1);
+  }
+}
+
+function selectedResetTargets() {
+  return {
+    settings: Boolean(elements.resetSettingsInput?.checked),
+    progress: Boolean(elements.resetProgressInput?.checked),
+    bookmarks: Boolean(elements.resetBookmarksInput?.checked),
+    books: Boolean(elements.resetBooksInput?.checked)
+  };
+}
+
+function describeResetTargets(targets) {
+  const labels = [];
+  if (targets.settings) {
+    labels.push(t("readerResetTargetSettings"));
+  }
+  if (targets.progress) {
+    labels.push(t("readerResetTargetProgress"));
+  }
+  if (targets.bookmarks) {
+    labels.push(t("readerResetTargetBookmarks"));
+  }
+  if (targets.books) {
+    labels.push(t("readerResetTargetBooks"));
+  }
+
+  return labels;
+}
+
+async function handleResetData() {
+  const targets = selectedResetTargets();
+  const labels = describeResetTargets(targets);
+  if (!labels.length) {
+    setBackupStatus(t("readerResetNothingSelected"), true);
+    return;
+  }
+
+  const confirmed = window.confirm(
+    t("readerResetConfirm", {
+      targets: labels.join(" / ")
+    })
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await resetReaderData(targets);
+    state.chapterPageCache.clear();
+
+    if (targets.settings) {
+      state.settings = await getReaderSettings();
+      applySettings();
+      detectPagesPerView();
+    }
+
+    state.books = await listBooks();
+    renderLibrary();
+    await refreshRecentReads();
+
+    if (!state.books.length) {
+      state.book = null;
+      state.bookmarks = [];
+      state.pages = [];
+      state.currentChapterIndex = 0;
+      state.currentPageIndex = 0;
+      elements.fileMeta.textContent = t("readerNoFile");
+      renderBookmarks();
+      renderToc();
+      renderSpread();
+    } else {
+      const currentBookStillExists = state.book && state.books.some((item) => item.id === state.book.id);
+      if (currentBookStillExists) {
+        await loadBook(state.book.id);
+      } else {
+        await loadBook(state.books[0].id);
+      }
+    }
+
+    setBackupStatus(
+      t("readerResetDone", {
+        targets: labels.join(" / ")
+      })
+    );
+  } catch (error) {
+    console.error(error);
+    setBackupStatus(error instanceof Error ? error.message : t("readerResetFailed"), true);
   }
 }
 
@@ -1082,6 +1182,11 @@ function bindEvents() {
     handleExportBackup();
   });
   elements.importBackup.addEventListener("change", handleImportBackup);
+    if (elements.resetSettings) {
+      elements.resetSettings.addEventListener("click", () => {
+        handleResetData();
+      });
+    }
   elements.librarySelect.addEventListener("change", (event) => {
     if (event.target.value) {
       loadBook(event.target.value);
@@ -1151,81 +1256,71 @@ function bindEvents() {
       return;
     }
 
-    if (event.key === "Escape" && shortcutsOpen) {
-      event.preventDefault();
+    const resolved = resolveReaderKeyAction({
+      key: event.key,
+      altKey: event.altKey,
+      shiftKey: event.shiftKey,
+      isScrollMode: isScrollMode(),
+      shortcutsOpen
+    });
+
+    if (!resolved) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (resolved.action === "closeShortcuts") {
       setShortcutsOverlay(false);
       return;
     }
 
-    if (event.key === "?" || event.key.toLowerCase() === "h") {
-      event.preventDefault();
+    if (resolved.action === "openShortcuts") {
       setShortcutsOverlay(true);
       return;
     }
 
-    if (event.key === "Tab") {
-      event.preventDefault();
+    if (resolved.action === "togglePanel") {
       toggleSidePanel();
+      return;
     }
 
-    if (event.altKey && event.key.toLowerCase() === "d") {
-      event.preventDefault();
+    if (resolved.action === "toggleDebug") {
       toggleDebugPanel();
+      return;
     }
 
-    if (event.key === "ArrowRight" || (!isScrollMode() && event.key.toLowerCase() === "j")) {
-      event.preventDefault();
+    if (resolved.action === "nextChapter") {
+      goToChapter(state.currentChapterIndex + 1);
+      return;
+    }
+
+    if (resolved.action === "prevChapter") {
+      goToChapter(state.currentChapterIndex - 1);
+      return;
+    }
+
+    if (resolved.action === "nextPage") {
       nextPage();
+      return;
     }
 
-    if (event.key === "ArrowLeft" || (!isScrollMode() && event.key.toLowerCase() === "k")) {
-      event.preventDefault();
+    if (resolved.action === "prevPage") {
       prevPage();
+      return;
     }
 
-    if (isScrollMode() && event.key === "ArrowDown") {
-      event.preventDefault();
+    if (resolved.action === "scrollLineDown") {
       scrollByLine(1);
+      return;
     }
 
-    if (isScrollMode() && event.key === "ArrowUp") {
-      event.preventDefault();
+    if (resolved.action === "scrollLineUp") {
       scrollByLine(-1);
+      return;
     }
 
-    if (event.key === " ") {
-      event.preventDefault();
-      if (isScrollMode()) {
-        handleScrollModeSpace(event.shiftKey ? -1 : 1);
-      } else {
-        if (event.shiftKey) {
-          if (state.currentChapterIndex > 0) {
-            goToChapter(state.currentChapterIndex - 1);
-          }
-        } else {
-          if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
-            goToChapter(state.currentChapterIndex + 1);
-          }
-        }
-      }
-    }
-
-    if (event.key === "[") {
-      event.preventDefault();
-      if (state.currentChapterIndex > 0) {
-        goToChapter(state.currentChapterIndex - 1);
-      }
-    }
-
-    if (event.key === "]") {
-      event.preventDefault();
-      if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
-        goToChapter(state.currentChapterIndex + 1);
-      }
-    }
-
-    if (event.key.toLowerCase() === "b") {
-      event.preventDefault();
+    if (resolved.action === "bookmark") {
       addBookmark();
     }
   });
@@ -1234,6 +1329,14 @@ function bindEvents() {
 
 async function bootstrap() {
   applyI18n();
+  const syncSupport = getSyncSupportInfo();
+  if (!syncSupport.syncAvailable) {
+    setBackupStatus(
+      t("readerSyncFallbackLocalOnly", {
+        provider: syncSupport.provider
+      })
+    );
+  }
   state.settings = await getReaderSettings();
   state.books = await listBooks();
   detectPagesPerView();

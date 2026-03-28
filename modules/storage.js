@@ -14,6 +14,10 @@ const DEFAULT_SETTINGS = {
 const DATABASE_NAME = "xyfy-txt-reader";
 const DATABASE_VERSION = 1;
 
+const PROVIDER_CHROME = "chrome";
+const PROVIDER_EDGE = "edge";
+const PROVIDER_UNKNOWN = "unknown";
+
 function requestToPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -73,8 +77,54 @@ function storageArea() {
   return chrome.storage.local;
 }
 
+export function detectBrowserProvider(userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "") {
+  const normalized = String(userAgent || "");
+  if (/Edg\//i.test(normalized)) {
+    return PROVIDER_EDGE;
+  }
+  if (/Chrome\//i.test(normalized) || /Chromium\//i.test(normalized)) {
+    return PROVIDER_CHROME;
+  }
+  return PROVIDER_UNKNOWN;
+}
+
+function syncProfile(provider = detectBrowserProvider()) {
+  const hasSync = typeof chrome !== "undefined" && Boolean(chrome.storage?.sync);
+  if (provider === PROVIDER_EDGE) {
+    return {
+      provider,
+      enabled: hasSync,
+      reason: hasSync ? "ok" : "edge_sync_unavailable"
+    };
+  }
+
+  if (provider === PROVIDER_CHROME) {
+    return {
+      provider,
+      enabled: hasSync,
+      reason: hasSync ? "ok" : "chrome_sync_unavailable"
+    };
+  }
+
+  return {
+    provider,
+    enabled: hasSync,
+    reason: hasSync ? "ok" : "sync_api_missing"
+  };
+}
+
+export function getSyncSupportInfo() {
+  const profile = syncProfile();
+  return {
+    provider: profile.provider,
+    syncAvailable: profile.enabled,
+    reason: profile.reason
+  };
+}
+
 function syncArea() {
-  if (typeof chrome === "undefined" || !chrome.storage?.sync) {
+  const profile = syncProfile();
+  if (!profile.enabled || typeof chrome === "undefined" || !chrome.storage?.sync) {
     return null;
   }
 
@@ -177,6 +227,67 @@ export async function saveReaderSettings(settings) {
     [SETTINGS_KEY]: nextSettings
   });
   await mirrorSettingsToSync(nextSettings);
+}
+
+async function clearStore(storeName) {
+  await withStore(storeName, "readwrite", async (store) => {
+    store.clear();
+  });
+}
+
+export async function resetReaderData(options = {}) {
+  const {
+    settings = true,
+    progress = true,
+    bookmarks = true,
+    books = false
+  } = options;
+  const area = storageArea();
+  const sync = syncArea();
+  const tasks = [];
+
+  if (settings && area) {
+    const defaultSettings = normalizeStoredSettings(DEFAULT_SETTINGS, Date.now());
+    tasks.push(
+      area.set({
+        [SETTINGS_KEY]: defaultSettings
+      })
+    );
+    if (sync) {
+      tasks.push(
+        sync.set({
+          [SETTINGS_SYNC_KEY]: defaultSettings
+        })
+      );
+    }
+  }
+
+  if (progress) {
+    tasks.push(clearStore("progress"));
+    if (sync) {
+      tasks.push(
+        sync.remove(PROGRESS_SYNC_KEY)
+      );
+    }
+  }
+
+  if (bookmarks) {
+    tasks.push(clearStore("bookmarks"));
+  }
+
+  if (books) {
+    tasks.push(clearStore("books"));
+  }
+
+  await Promise.all(tasks);
+
+  return {
+    settingsReset: Boolean(settings),
+    progressCleared: Boolean(progress),
+    bookmarksCleared: Boolean(bookmarks),
+    booksCleared: Boolean(books),
+    syncUsed: Boolean(sync)
+  };
 }
 
 export async function saveBook(book) {
