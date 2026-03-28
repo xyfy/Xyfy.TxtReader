@@ -576,6 +576,35 @@ function refreshI18nUi() {
 }
 
 const GIST_CONFIG_KEY = "gistCloudConfig";
+const GITHUB_API_ORIGIN = "https://api.github.com/*";
+
+function hasPermissionsApi() {
+  return Boolean(globalThis.chrome?.permissions?.contains && globalThis.chrome?.permissions?.request);
+}
+
+function hasGithubHostPermission() {
+  if (!hasPermissionsApi()) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolve) => {
+    chrome.permissions.contains({ origins: [GITHUB_API_ORIGIN] }, (granted) => {
+      resolve(Boolean(granted));
+    });
+  });
+}
+
+function requestGithubHostPermission() {
+  if (!hasPermissionsApi()) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolve) => {
+    chrome.permissions.request({ origins: [GITHUB_API_ORIGIN] }, (granted) => {
+      resolve(Boolean(granted));
+    });
+  });
+}
 
 function loadGistConfig() {
   return new Promise((resolve) => {
@@ -800,13 +829,19 @@ async function initializeCloudSection() {
     return;
   }
 
-  const ready = await state.cloudProvider.isReady();
-  state.cloudAuthed = ready;
+  const [ready, permissionGranted] = await Promise.all([
+    state.cloudProvider.isReady(),
+    hasGithubHostPermission()
+  ]);
+  state.cloudAuthed = ready && permissionGranted;
 
-  if (ready) {
+  if (state.cloudAuthed) {
     setCloudStatus(t("readerCloudConnected", { provider: state.cloudProviderName }), "connected");
     elements.cloudBackupsContainer.classList.remove("hidden");
     await refreshCloudBackups();
+  } else if (ready) {
+    setCloudStatus(t("readerCloudNeedPermission"), "needs-auth");
+    elements.cloudBackupsContainer.classList.add("hidden");
   } else {
     setCloudStatus(t("readerCloudNeedConfig"), "needs-auth");
     elements.cloudBackupsContainer.classList.add("hidden");
@@ -829,6 +864,11 @@ async function handleCloudConnect() {
 
     if (!gistId || !token) {
       throw new Error(t("readerCloudNeedConfig"));
+    }
+
+    const permissionGranted = await requestGithubHostPermission();
+    if (!permissionGranted) {
+      throw new Error(t("readerCloudPermissionDenied"));
     }
 
     const result = await state.cloudProvider.requestCloudAuth({ gistId, token });

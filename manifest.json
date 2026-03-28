@@ -4,8 +4,8 @@
   "name": "Xyfy TXT Reader",
   "version": "0.3.0",
   "description": "Local TXT novel reader for Chrome and Edge with book mode, scroll mode, immersive reading, backup, and sync.",
-  "permissions": ["storage"],
-  "host_permissions": ["https://api.github.com/*"],
+  "permissions": ["storage", "permissions"],
+  "optional_host_permissions": ["https://api.github.com/*"],
   "icons": {
     "16":  "icons/icon16.png",
     "32":  "icons/icon32.png",
