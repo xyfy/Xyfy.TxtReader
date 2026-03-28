@@ -245,6 +245,10 @@ export async function resetReaderData(options = {}) {
   const area = storageArea();
   const sync = syncArea();
   const tasks = [];
+  const settingsReset = Boolean(settings && area);
+  const progressCleared = Boolean(progress);
+  const bookmarksCleared = Boolean(bookmarks);
+  const booksCleared = Boolean(books);
 
   if (settings && area) {
     const defaultSettings = normalizeStoredSettings(DEFAULT_SETTINGS, Date.now());
@@ -282,10 +286,10 @@ export async function resetReaderData(options = {}) {
   await Promise.all(tasks);
 
   return {
-    settingsReset: Boolean(settings),
-    progressCleared: Boolean(progress),
-    bookmarksCleared: Boolean(bookmarks),
-    booksCleared: Boolean(books),
+    settingsReset,
+    progressCleared,
+    bookmarksCleared,
+    booksCleared,
     syncUsed: Boolean(sync)
   };
 }

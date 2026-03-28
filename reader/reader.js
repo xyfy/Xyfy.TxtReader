@@ -48,7 +48,7 @@ const elements = {
   exportBackup: document.getElementById("export-backup"),
   importBackup: document.getElementById("import-backup"),
   backupStatus: document.getElementById("backup-status"),
-  resetSettings: document.getElementById("reset-settings"),
+  resetData: document.getElementById("reset-data"),
   resetSettingsInput: document.getElementById("reset-target-settings"),
   resetProgressInput: document.getElementById("reset-target-progress"),
   resetBookmarksInput: document.getElementById("reset-target-bookmarks"),
@@ -1182,11 +1182,11 @@ function bindEvents() {
     handleExportBackup();
   });
   elements.importBackup.addEventListener("change", handleImportBackup);
-    if (elements.resetSettings) {
-      elements.resetSettings.addEventListener("click", () => {
-        handleResetData();
-      });
-    }
+  if (elements.resetData) {
+    elements.resetData.addEventListener("click", () => {
+      handleResetData();
+    });
+  }
   elements.librarySelect.addEventListener("change", (event) => {
     if (event.target.value) {
       loadBook(event.target.value);
