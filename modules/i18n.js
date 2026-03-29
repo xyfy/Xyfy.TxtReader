@@ -2,6 +2,22 @@ const LOCALE_ZH = "zh_CN";
 const LOCALE_EN = "en";
 const LOCALE_STORAGE_KEY = "uiLocale";
 
+function readLocaleFromWebStorage() {
+  try {
+    return globalThis.localStorage?.getItem(LOCALE_STORAGE_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocaleToWebStorage(locale) {
+  try {
+    globalThis.localStorage?.setItem(LOCALE_STORAGE_KEY, locale);
+  } catch {
+    // Ignore storage write failures in restricted browser contexts.
+  }
+}
+
 export const MESSAGES = {
   en: {
     extName: "Xyfy TXT Reader",
@@ -318,6 +334,10 @@ export function getSupportedLocales() {
 
 export async function initializeI18n() {
   if (!globalThis.chrome?.storage?.local) {
+    const savedLocale = readLocaleFromWebStorage();
+    if (isSupportedLocale(savedLocale)) {
+      currentLocale = savedLocale;
+    }
     return currentLocale;
   }
 
@@ -344,6 +364,8 @@ export async function setLocale(locale) {
     await new Promise((resolve) => {
       chrome.storage.local.set({ [LOCALE_STORAGE_KEY]: locale }, () => resolve());
     });
+  } else {
+    writeLocaleToWebStorage(locale);
   }
   return currentLocale;
 }

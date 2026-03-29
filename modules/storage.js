@@ -19,6 +19,66 @@ const PROVIDER_CHROME = "chrome";
 const PROVIDER_EDGE = "edge";
 const PROVIDER_UNKNOWN = "unknown";
 
+function webLocalStorage() {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function createWebStorageArea(storage) {
+  const readValue = (key, fallback) => {
+    const raw = storage.getItem(key);
+    if (raw === null) {
+      return fallback;
+    }
+
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return fallback;
+    }
+  };
+
+  return {
+    async get(keys) {
+      if (typeof keys === "string") {
+        return {
+          [keys]: readValue(keys, undefined)
+        };
+      }
+
+      if (Array.isArray(keys)) {
+        return keys.reduce((result, key) => {
+          result[key] = readValue(key, undefined);
+          return result;
+        }, {});
+      }
+
+      if (keys && typeof keys === "object") {
+        return Object.entries(keys).reduce((result, [key, fallback]) => {
+          result[key] = readValue(key, fallback);
+          return result;
+        }, {});
+      }
+
+      return {};
+    },
+    async set(items) {
+      for (const [key, value] of Object.entries(items || {})) {
+        storage.setItem(key, JSON.stringify(value));
+      }
+    },
+    async remove(keys) {
+      const normalizedKeys = Array.isArray(keys) ? keys : [keys];
+      for (const key of normalizedKeys) {
+        storage.removeItem(key);
+      }
+    }
+  };
+}
+
 function requestToPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -71,11 +131,12 @@ async function withStore(storeName, mode, callback) {
 }
 
 function storageArea() {
-  if (typeof chrome === "undefined" || !chrome.storage?.local) {
-    return null;
+  if (typeof chrome !== "undefined" && chrome.storage?.local) {
+    return chrome.storage.local;
   }
 
-  return chrome.storage.local;
+  const storage = webLocalStorage();
+  return storage ? createWebStorageArea(storage) : null;
 }
 
 export function detectBrowserProvider(userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "") {

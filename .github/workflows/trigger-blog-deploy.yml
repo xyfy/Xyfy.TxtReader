@@ -1,0 +1,34 @@
+name: Trigger Blog Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      txtreader_ref:
+        description: "txtReader ref to deploy (branch, tag, or commit SHA)"
+        required: false
+        default: "web-app"
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve ref
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.txtreader_ref }}" ]; then
+            echo "ref=${{ github.event.inputs.txtreader_ref }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger blog deploy workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.BLOG_REPO_PAT }}
+          repository: xyfy/blog
+          event-type: txtreader-webapp-published
+          client-payload: >-
+            {"txtreader_ref":"${{ steps.vars.outputs.ref }}","txtreader_sha":"${{ github.sha }}","source_repo":"${{ github.repository }}"}

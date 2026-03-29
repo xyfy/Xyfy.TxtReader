@@ -51,6 +51,14 @@ const state = {
 
 const PAGE_CACHE_LIMIT = 8;
 
+function webLocalStorage() {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const elements = {
   fileInput: document.getElementById("file-input"),
   fileMeta: document.getElementById("file-meta"),
@@ -609,7 +617,21 @@ function requestGithubHostPermission() {
 function loadGistConfig() {
   return new Promise((resolve) => {
     if (!globalThis.chrome?.storage?.local) {
-      resolve({ gistId: "", token: "" });
+      const storage = webLocalStorage();
+      if (!storage) {
+        resolve({ gistId: "", token: "" });
+        return;
+      }
+
+      try {
+        const config = JSON.parse(storage.getItem(GIST_CONFIG_KEY) || "{}");
+        resolve({
+          gistId: typeof config.gistId === "string" ? config.gistId : "",
+          token: typeof config.token === "string" ? config.token : ""
+        });
+      } catch {
+        resolve({ gistId: "", token: "" });
+      }
       return;
     }
 
@@ -626,6 +648,10 @@ function loadGistConfig() {
 function saveGistConfig(config) {
   return new Promise((resolve) => {
     if (!globalThis.chrome?.storage?.local) {
+      const storage = webLocalStorage();
+      if (storage) {
+        storage.setItem(GIST_CONFIG_KEY, JSON.stringify(config));
+      }
       resolve();
       return;
     }

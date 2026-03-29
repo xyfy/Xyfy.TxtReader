@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build:zip": "rm -f dist/xyfy-txt-reader-v$npm_package_version.zip && mkdir -p dist && zip -r dist/xyfy-txt-reader-v$npm_package_version.zip . -x 'dist/*' '.git/*' '.github/*' 'node_modules/*' 'tests/*' 'docs/*' 'scripts/*' '*.DS_Store'",
+    "build:webapp": "node scripts/build-webapp.mjs",
     "gen:icons": "node scripts/gen-icons.mjs",
     "test": "npm run test:paginator && npm run test:backup && npm run test:storage-sync && npm run test:cloud-provider",
     "test:paginator": "node tests/paginator.test.mjs",
