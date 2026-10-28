@@ -22,8 +22,8 @@ export const READER_ACTIONS = [
 ];
 
 export const DEFAULT_KEYBINDINGS = {
-  nextChapter: [{ key: "ArrowRight" }, { key: "[" }],
-  prevChapter: [{ key: "ArrowLeft" }, { key: "]" }],
+  nextChapter: [{ key: "ArrowRight" }, { key: "]" }],
+  prevChapter: [{ key: "ArrowLeft" }, { key: "[" }],
   nextPage: [{ key: " ", shiftKey: false }],
   prevPage: [{ key: " ", shiftKey: true }],
   scrollLineDown: [{ key: "ArrowDown" }],
@@ -103,7 +103,19 @@ export function detectKeybindingConflict(action, binding, keybindings = DEFAULT_
   return null;
 }
 
-// 将绑定格式化为人类可读文案，例如 "Ctrl+Alt+D"、"Space"、"ArrowRight"。
+// 常用键的显示名，避免界面里同时出现 "ArrowRight" 与 "→" 两种写法。
+const KEY_LABELS = {
+  " ": "Space",
+  ArrowUp: "↑",
+  ArrowDown: "↓",
+  ArrowLeft: "←",
+  ArrowRight: "→",
+  Escape: "Esc",
+  Enter: "Enter",
+  Tab: "Tab"
+};
+
+// 将绑定格式化为人类可读文案，例如 "Ctrl+Alt+D"、"Space"、"→"。
 export function formatBinding(binding) {
   const b = normalizeBinding(binding);
   const parts = [];
@@ -112,9 +124,29 @@ export function formatBinding(binding) {
   if (b.metaKey) parts.push("Meta");
   if (b.shiftKey) parts.push("Shift");
   let key = b.key;
-  if (key === " ") key = "Space";
-  parts.push(key.length === 1 ? key.toUpperCase() : key);
+  if (Object.prototype.hasOwnProperty.call(KEY_LABELS, key)) {
+    key = KEY_LABELS[key];
+  } else {
+    key = key.length === 1 ? key.toUpperCase() : key;
+  }
+  parts.push(key);
   return parts.join("+");
+}
+
+// 取出某动作的全部绑定（统一成数组，便于界面展示多绑定场景）。
+export function getActionBindings(keybindings, action) {
+  const list = keybindings ? keybindings[action] : null;
+  if (Array.isArray(list)) {
+    return list.filter((item) => item && typeof item.key === "string" && item.key !== "");
+  }
+  return list && typeof list.key === "string" && list.key !== "" ? [list] : [];
+}
+
+// 将某动作的全部绑定拼成一行展示文案，例如 "→ / ]"；无绑定时返回空串。
+export function formatActionBindings(keybindings, action) {
+  return getActionBindings(keybindings, action)
+    .map((item) => formatBinding(item))
+    .join(" / ");
 }
 
 // 将字符串渲染为单个绑定对象（用于把捕获到的按键序列转成可存储结构）。

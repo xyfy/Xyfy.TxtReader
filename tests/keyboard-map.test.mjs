@@ -4,6 +4,7 @@ import {
   READER_ACTIONS,
   detectKeybindingConflict,
   eventToBinding,
+  formatActionBindings,
   formatBinding,
   matchKeyBinding,
   resolveReaderKeyAction
@@ -53,13 +54,32 @@ function run() {
 
   assert.equal(formatBinding({ key: " ", shiftKey: true }), "Shift+Space");
   assert.equal(formatBinding({ key: "d", altKey: true }), "Alt+D");
-  assert.equal(formatBinding({ key: "ArrowDown" }), "ArrowDown");
+  assert.equal(formatBinding({ key: "ArrowDown" }), "↓");
+  assert.equal(formatBinding({ key: "ArrowRight" }), "→");
+  assert.equal(formatBinding({ key: "Escape" }), "Esc");
+  assert.equal(formatBinding({ key: "[" }), "[");
 
   const binding = eventToBinding({ key: "a", altKey: true, ctrlKey: false, metaKey: false, shiftKey: false });
   assert.deepEqual(binding, { key: "a", altKey: true, ctrlKey: false, metaKey: false, shiftKey: false });
 
   assert.ok(Array.isArray(READER_ACTIONS) && READER_ACTIONS.includes("nextChapter"));
   assert.ok(DEFAULT_KEYBINDINGS.nextChapter && DEFAULT_KEYBINDINGS.nextChapter.length >= 1);
+
+  // 方括号方向：`[` 向左回退、`]` 向右前进，与方向键语义一致
+  assert.equal(matchKeyBinding({ key: "[" }), "prevChapter");
+  assert.equal(matchKeyBinding({ key: "]" }), "nextChapter");
+  assert.equal(matchKeyBinding({ key: "[", shiftKey: true }), null);
+  // 新旧两条解析路径必须给出相同结果，防止其中一处回退导致行为反转
+  assert.equal(resolveReaderKeyAction({ key: "[" }).action, matchKeyBinding({ key: "[" }));
+  assert.equal(resolveReaderKeyAction({ key: "]" }).action, matchKeyBinding({ key: "]" }));
+  assert.equal(resolveReaderKeyAction({ key: "[" }).action, "prevChapter");
+  assert.equal(resolveReaderKeyAction({ key: "]" }).action, "nextChapter");
+
+  // 多绑定展示：次要键位必须在界面上可见，否则重绑时会误以为只有主键
+  assert.equal(formatActionBindings(DEFAULT_KEYBINDINGS, "nextChapter"), "→ / ]");
+  assert.equal(formatActionBindings(DEFAULT_KEYBINDINGS, "prevChapter"), "← / [");
+  assert.equal(formatActionBindings({}, "nextChapter"), "");
+  assert.equal(formatActionBindings({ nextChapter: [] }, "nextChapter"), "");
 
   console.log("keyboard map tests passed");
 }

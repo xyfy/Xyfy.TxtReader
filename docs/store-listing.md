@@ -10,7 +10,7 @@
 
 ## 简短描述（80-132 字符可裁剪）
 
-本地 TXT 小说阅读器，支持章节识别、书本双页与滚动阅读、沉浸模式、书签、阅读进度同步与备份恢复。
+本地 TXT 小说阅读器，支持章节识别、书本双页与滚动阅读、沉浸模式、书签、进度同步与备份恢复，可自定义快捷键、主题配色与字体。
 
 ## 详细描述（中文版）
 
@@ -26,6 +26,9 @@ Xyfy TXT Reader 是一个面向本地 TXT 文件的浏览器阅读扩展。你�
 - 轻量阅读进度同步（chrome.storage.sync）
 - JSON 备份导出与导入恢复
 - 可选 Gist 云备份（写入用户自己的 GitHub Gist）
+- 自定义快捷键：逐项重绑，冲突键位实时拦截，可一键恢复默认
+- 自定义模板颜色：主题可选“自定义”，分别调整背景、纸面、正文、次要、强调、强强调 6 个颜色
+- 自定义字体：预设之外可填写任意字体栈，实时预览，非法值自动回退
 
 隐私与数据：
 
@@ -48,6 +51,9 @@ Key features:
 - Lightweight progress/settings sync via chrome.storage.sync
 - JSON backup export and restore
 - Optional Gist backup stored in the user's own GitHub Gist
+- Custom keyboard shortcuts with conflict detection and one-click reset
+- Custom theme colors: adjust background, surface, text, muted, accent and strong accent
+- Custom font stack with live preview and safe fallback
 
 Privacy and data handling:
 
@@ -58,12 +64,19 @@ Privacy and data handling:
 
 ## 更新日志模板
 
-版本 0.2.0
+版本 0.4.1
 
-- 新增：本地备份导入导出
-- 新增：轻量阅读进度同步
-- 优化：大章节分页性能与缓存
-- 修复：章节边界翻页行为
+- 调整：方括号键位方向修正，`[` 为上一章、`]` 为下一章，与方向键语义一致
+- 优化：移除向所有网站暴露内部文件的声明，缩小权限面
+- 修复：键盘映射测试未纳入测试链，长期未被 CI 执行
+
+版本 0.4.0
+
+- 新增：自定义快捷键，支持逐项重绑、冲突拦截与一键恢复默认
+- 新增：自定义模板颜色，主题新增“自定义”，可调整 6 个颜色并给出对比度提示
+- 新增：自定义字体，支持任意字体栈、实时预览与非法值回退
+- 修复：深色配色下外层背景、侧栏、下拉框仍为浅色导致文字不可读
+- 修复：自定义配色下边框与纸影无法表达透明度
 
 ---
 
