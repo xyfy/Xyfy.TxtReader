@@ -7,15 +7,14 @@ const SETTINGS_UPDATED_AT_KEY = "settingsUpdatedAt";
 const DEFAULT_SETTINGS = {
   theme: "paper",
   customFont: "",
+  // 仅收 6 个不透明实色；边框/纸影由正文色派生，避免取色器丢透明度
   themeColors: {
     bgColor: "",
     surfaceColor: "",
-    surfaceShadow: "",
     textColor: "",
     mutedColor: "",
     accentColor: "",
-    accentStrong: "",
-    borderColor: ""
+    accentStrong: ""
   },
   fontFamily: '"Noto Serif SC", Georgia, serif',
   fontSize: 18,

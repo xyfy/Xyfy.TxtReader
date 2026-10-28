@@ -1140,16 +1140,19 @@ function renderBookmarks() {
   }
 }
 
-const COLOR_KEYS = ["bgColor", "surfaceColor", "surfaceShadow", "textColor", "mutedColor", "accentColor", "accentStrong", "borderColor"];
+// 仅 6 个不透明实色可由用户调整；边框/纸影由正文色按低透明度派生
+const COLOR_KEYS = ["bgColor", "surfaceColor", "textColor", "mutedColor", "accentColor", "accentStrong"];
 const COLOR_VAR_MAP = {
   bgColor: "--bg-color",
   surfaceColor: "--surface-color",
-  surfaceShadow: "--surface-shadow",
   textColor: "--text-color",
   mutedColor: "--muted-color",
   accentColor: "--accent-color",
-  accentStrong: "--accent-strong",
-  borderColor: "--border-color"
+  accentStrong: "--accent-strong"
+};
+const DERIVED_VAR_ALPHA = {
+  "--border-color": 0.22,
+  "--surface-shadow": 0.18
 };
 // 仅允许字体族常见字符，拒绝 < > ; @ 与 url() 等可能注入/破坏布局的内容。
 const FONT_FAMILY_SAFE = /^[A-Za-z0-9 ,."'_()-]+$/;
@@ -1170,6 +1173,26 @@ function getEffectiveFont(settings) {
 
 function toColorInputValue(hex) {
   return typeof hex === "string" && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : "#000000";
+}
+
+function rgbStringToHex(value) {
+  const m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(value || "");
+  if (!m) return "";
+  return `#${[1, 2, 3].map((i) => Number(m[i]).toString(16).padStart(2, "0")).join("")}`;
+}
+
+// 读取当前生效的调色板（用于切入自定义主题时以现有观感为起点）
+function captureCurrentPalette() {
+  const probe = document.createElement("span");
+  probe.style.display = "none";
+  document.body.append(probe);
+  const palette = {};
+  for (const key of COLOR_KEYS) {
+    probe.style.color = `var(${COLOR_VAR_MAP[key]})`;
+    palette[key] = rgbStringToHex(getComputedStyle(probe).color);
+  }
+  probe.remove();
+  return palette;
 }
 
 function parseHex(hex) {
@@ -1212,6 +1235,22 @@ function applyFontSettings() {
   if (elements.fontPreview) elements.fontPreview.style.fontFamily = effective;
 }
 
+function hexToRgba(hex, alpha) {
+  const rgb = parseHex(hex);
+  if (!rgb) return "";
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+}
+
+// 按比例把颜色推向黑/白，用于由主色派生出外壳渐变的第二色
+function shiftHex(hex, amount) {
+  const rgb = parseHex(hex);
+  if (!rgb) return "";
+  const target = amount < 0 ? 0 : 255;
+  const mix = Math.abs(amount);
+  const channel = (c) => Math.round(c + (target - c) * mix);
+  return `#${[rgb.r, rgb.g, rgb.b].map((c) => channel(c).toString(16).padStart(2, "0")).join("")}`;
+}
+
 function applyTheme() {
   const { theme, themeColors } = state.settings;
   const root = document.documentElement;
@@ -1226,10 +1265,44 @@ function applyTheme() {
         root.style.removeProperty(COLOR_VAR_MAP[key]);
       }
     }
+    // 边框与纸影不可用取色器表达（带透明度），统一由正文色派生，保证与自定义底色和谐
+    for (const [varName, alpha] of Object.entries(DERIVED_VAR_ALPHA)) {
+      const derived = themeColors?.textColor ? hexToRgba(themeColors.textColor, alpha) : "";
+      if (derived) {
+        root.style.setProperty(varName, derived);
+      } else {
+        root.style.removeProperty(varName);
+      }
+    }
+    // 外层背景渐变也随之推导，否则深色自定义主题下侧栏/页头仍残留浅色米调
+    const bg = themeColors?.bgColor;
+    if (bg) {
+      const light = (relativeLuminance(parseHex(bg)) || 0) > 0.5;
+      root.style.setProperty("--bg-gradient-start", shiftHex(bg, light ? -0.08 : -0.05));
+      root.style.setProperty("--bg-glow", `rgba(255, 255, 255, ${light ? 0.4 : 0.05})`);
+      root.style.setProperty("--control-bg", `rgba(255, 255, 255, ${light ? 0.35 : 0.1})`);
+      root.style.setProperty(
+        "--panel-wash",
+        themeColors?.surfaceColor ? hexToRgba(themeColors.surfaceColor, light ? 0.4 : 0.55) : ""
+      );
+      if (!themeColors?.surfaceColor) root.style.removeProperty("--panel-wash");
+    } else {
+      root.style.removeProperty("--bg-gradient-start");
+      root.style.removeProperty("--bg-glow");
+      root.style.removeProperty("--control-bg");
+      root.style.removeProperty("--panel-wash");
+    }
   } else {
     for (const key of COLOR_KEYS) {
       root.style.removeProperty(COLOR_VAR_MAP[key]);
     }
+    for (const varName of Object.keys(DERIVED_VAR_ALPHA)) {
+      root.style.removeProperty(varName);
+    }
+    root.style.removeProperty("--bg-gradient-start");
+    root.style.removeProperty("--bg-glow");
+    root.style.removeProperty("--control-bg");
+    root.style.removeProperty("--panel-wash");
     document.body.dataset.theme = theme || "paper";
   }
 
@@ -1789,10 +1862,17 @@ async function addBookmark() {
 }
 
 async function handleSettingsChange() {
+  const nextTheme = elements.themeSelect.value;
+  let themeColors = state.settings.themeColors;
+  // 首次切入自定义主题时，先按当前观感填好各色值，而不是留空让用户从零调
+  if (nextTheme === "custom" && !Object.values(themeColors || {}).some(Boolean)) {
+    themeColors = captureCurrentPalette();
+  }
   state.settings = {
     ...state.settings,
     readingMode: elements.readingMode.value,
-    theme: elements.themeSelect.value,
+    theme: nextTheme,
+    themeColors,
     fontFamily: elements.fontSelect.value,
     fontSize: Number(elements.fontSize.value),
     lineHeight: state.settings.lineHeight,
@@ -1801,6 +1881,9 @@ async function handleSettingsChange() {
     showStats: Boolean(elements.showStats?.checked)
   };
   applySettings();
+  if (nextTheme === "custom") {
+    updateContrastWarning(state.settings.themeColors);
+  }
   detectPagesPerView();
   await saveReaderSettings(state.settings);
   rebuildPages();
@@ -1832,12 +1915,10 @@ function toggleDebugPanel() {
 const EMPTY_THEME_COLORS = {
   bgColor: "",
   surfaceColor: "",
-  surfaceShadow: "",
   textColor: "",
   mutedColor: "",
   accentColor: "",
-  accentStrong: "",
-  borderColor: ""
+  accentStrong: ""
 };
 
 const ACTION_LABEL_KEY = {
@@ -1960,10 +2041,12 @@ function resetColors() {
 
 function updateContrastWarning(colors) {
   if (!elements.contrastWarning) return;
-  const ratio =
-    contrastRatio(colors.textColor, colors.bgColor) ??
-    contrastRatio(colors.textColor, colors.surfaceColor);
-  const tooLow = ratio !== null && ratio < 4.5;
+  // 正文同时显示在页面底色与纸面（面板/卡片）上，两者都需达标
+  const ratios = [
+    contrastRatio(colors.textColor, colors.bgColor),
+    contrastRatio(colors.textColor, colors.surfaceColor)
+  ].filter((r) => r !== null);
+  const tooLow = ratios.some((r) => r < 4.5);
   elements.contrastWarning.classList.toggle("hidden", !tooLow);
 }
 

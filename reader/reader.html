@@ -126,14 +126,6 @@
                 <option value='"LXGW WenKai", "Kaiti SC", serif' data-i18n="readerFontKai">Kai</option>
               </select>
             </label>
-            <label class="settings-switch" style="margin-top: 0">
-              <input id="use-custom-font" type="checkbox" />
-              <span data-i18n="chkUseCustomFont">使用自定义字体</span>
-            </label>
-            <label class="font-custom-field">
-              <input id="custom-font" type="text" placeholder='"LXGW WenKai", serif' data-i18n-attr="placeholder:readerFontCustomPlaceholder" />
-            </label>
-            <p id="font-preview" class="file-meta" data-i18n="lblFontPreview">预览：窗含西岭千秋雪</p>
             <label>
               <span data-i18n="readerFontSizeLabel">Font Size</span>
               <input id="font-size" type="range" min="14" max="28" step="1" />
@@ -208,18 +200,29 @@
             </section>
             <section class="settings-section">
               <div class="section-head">
+                <p class="panel-label" data-i18n="sectionCustomFont">自定义字体</p>
+              </div>
+              <label class="settings-switch">
+                <input id="use-custom-font" type="checkbox" />
+                <span data-i18n="chkUseCustomFont">使用自定义字体</span>
+              </label>
+              <label class="font-custom-field">
+                <input id="custom-font" type="text" placeholder='"LXGW WenKai", serif' data-i18n-attr="placeholder:readerFontCustomPlaceholder" />
+              </label>
+              <p id="font-preview" class="font-preview" data-i18n="lblFontPreview">预览：窗含西岭千秋雪</p>
+            </section>
+            <section class="settings-section">
+              <div class="section-head">
                 <p class="panel-label" data-i18n="sectionTemplateColor">Template Color</p>
               </div>
               <p class="file-meta" data-i18n="templateColorHint">选择“自定义”主题后即可调整下列颜色（留空则沿用对应预设）。</p>
               <div id="theme-color-grid" class="color-grid">
                 <label><span data-i18n="lblBgColor">背景</span><input type="color" class="color-input" data-color-key="bgColor" /></label>
                 <label><span data-i18n="lblSurfaceColor">纸面</span><input type="color" class="color-input" data-color-key="surfaceColor" /></label>
-                <label><span data-i18n="lblSurfaceShadow">纸影</span><input type="color" class="color-input" data-color-key="surfaceShadow" /></label>
                 <label><span data-i18n="lblTextColor">正文</span><input type="color" class="color-input" data-color-key="textColor" /></label>
                 <label><span data-i18n="lblMutedColor">次要</span><input type="color" class="color-input" data-color-key="mutedColor" /></label>
                 <label><span data-i18n="lblAccentColor">强调</span><input type="color" class="color-input" data-color-key="accentColor" /></label>
                 <label><span data-i18n="lblAccentStrong">强强调</span><input type="color" class="color-input" data-color-key="accentStrong" /></label>
-                <label><span data-i18n="lblBorderColor">边框</span><input type="color" class="color-input" data-color-key="borderColor" /></label>
               </div>
               <p id="contrast-warning" class="color-warning hidden" data-i18n="warnContrastLow">文字与背景对比度偏低，可能影响阅读清晰度。</p>
               <div class="action-row">
