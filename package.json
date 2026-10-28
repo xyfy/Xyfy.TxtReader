@@ -1,17 +1,18 @@
 {
   "name": "xyfy-txt-reader",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "build:zip": "rm -f dist/xyfy-txt-reader-v$npm_package_version.zip && mkdir -p dist && zip -r dist/xyfy-txt-reader-v$npm_package_version.zip . -x 'dist/*' '.git/*' '.github/*' '.vscode/*' 'node_modules/*' 'tests/*' 'docs/*' 'scripts/*' 'web/*' 'eslint.config.js' 'package-lock.json' 'tag-release.sh' 'package.json' '*.DS_Store'",
+    "build:zip": "rm -f dist/xyfy-txt-reader-v$npm_package_version.zip && mkdir -p dist && zip -r dist/xyfy-txt-reader-v$npm_package_version.zip . -x 'dist/*' '.git/*' '.github/*' '.vscode/*' 'node_modules/*' 'tests/*' 'docs/*' 'scripts/*' 'web/*' 'eslint.config.js' 'package-lock.json' 'tag-release.sh' 'package.json' '.gitignore' 'icons/icon.svg' '*.DS_Store'",
     "build:webapp": "node scripts/build-webapp.mjs",
     "lint": "eslint .",
     "gen:icons": "node scripts/gen-icons.mjs",
-    "test": "npm run test:paginator && npm run test:backup && npm run test:storage-sync && npm run test:cloud-provider",
+    "test": "npm run test:paginator && npm run test:backup && npm run test:storage-sync && npm run test:keyboard && npm run test:cloud-provider",
     "test:paginator": "node tests/paginator.test.mjs",
     "test:backup": "node tests/backup.test.mjs",
     "test:storage-sync": "node tests/storage-sync.test.mjs",
+    "test:keyboard": "node tests/keyboard-map.test.mjs",
     "test:cloud-provider": "node tests/cloud-provider.test.mjs"
   },
   "devDependencies": {

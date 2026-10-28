@@ -27,7 +27,7 @@ import {
   READER_ACTIONS,
   detectKeybindingConflict,
   eventToBinding,
-  formatBinding,
+  formatActionBindings,
   matchKeyBinding
 } from "../modules/keyboard-map.js";
 
@@ -1935,20 +1935,16 @@ const ACTION_LABEL_KEY = {
   closeShortcuts: "actCloseShortcuts"
 };
 
-function primaryBinding(keybindings, action) {
-  const list = keybindings ? keybindings[action] : null;
-  return Array.isArray(list) ? list[0] : list || null;
-}
-
 function renderShortcutHelp() {
   if (!elements.shortcutHelpList) return;
   elements.shortcutHelpList.innerHTML = "";
   for (const action of READER_ACTIONS) {
-    const binding = primaryBinding(state.settings.keybindings, action);
-    if (!binding) continue;
+    // 展示该动作的全部绑定（如「→ / ]」），避免次要键位生效却不可见。
+    const keys = formatActionBindings(state.settings.keybindings, action);
+    if (!keys) continue;
     const row = document.createElement("div");
     const key = document.createElement("strong");
-    key.textContent = formatBinding(binding);
+    key.textContent = keys;
     const desc = document.createElement("span");
     desc.textContent = t(ACTION_LABEL_KEY[action] || action);
     row.append(key, desc);
@@ -1961,7 +1957,6 @@ function renderShortcutList() {
   elements.shortcutList.innerHTML = "";
   for (const action of READER_ACTIONS) {
     if (action === "closeShortcuts") continue; // Escape 关闭浮层不可重绑
-    const binding = primaryBinding(state.settings.keybindings, action);
     const row = document.createElement("div");
     row.className = "shortcut-row";
     const label = document.createElement("span");
@@ -1970,7 +1965,10 @@ function renderShortcutList() {
     const keyBtn = document.createElement("button");
     keyBtn.type = "button";
     keyBtn.className = "shortcut-key";
-    keyBtn.textContent = binding ? formatBinding(binding) : "—";
+    // 展示全部绑定；重绑会整体替换为该动作的新键位，用 title 说明，避免用户误以为会追加。
+    const keys = formatActionBindings(state.settings.keybindings, action);
+    keyBtn.textContent = keys || "—";
+    keyBtn.title = t("shortcutRebindHint");
     keyBtn.addEventListener("click", () => startRebindCapture(action, keyBtn));
     row.append(label, keyBtn);
     elements.shortcutList.append(row);
@@ -1989,8 +1987,7 @@ function startRebindCapture(action, buttonEl) {
     document.removeEventListener("keydown", handler, true);
     buttonEl.classList.remove("capturing");
     rebindState = null;
-    const b = primaryBinding(state.settings.keybindings, action);
-    buttonEl.textContent = b ? formatBinding(b) : "—";
+    buttonEl.textContent = formatActionBindings(state.settings.keybindings, action) || "—";
   };
 
   const handler = (event) => {
