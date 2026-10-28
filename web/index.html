@@ -157,15 +157,27 @@
         </div>
         <div id="settings-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
           <div class="overlay-card settings-card">
-            <div class="section-head overlay-head">
-              <h2 id="settings-title" data-i18n="readerManageTitle">阅读管理</h2>
-              <button id="settings-close" class="small-button" type="button" data-i18n="readerShortcutsClose">关闭</button>
+            <div class="settings-sticky">
+              <div class="section-head overlay-head">
+                <h2 id="settings-title" data-i18n="readerManageTitle">阅读管理</h2>
+                <button id="settings-close" class="small-button" type="button" data-i18n="readerShortcutsClose">关闭</button>
+              </div>
+              <nav id="settings-nav" class="settings-nav" aria-label="Settings sections" data-i18n-attr="aria-label:navSettingsAria">
+                <button class="settings-nav-chip is-active" type="button" data-target="settings-general" data-i18n="navGeneral">通用</button>
+                <button class="settings-nav-chip" type="button" data-target="settings-backup" data-i18n="navBackup">备份</button>
+                <button class="settings-nav-chip" type="button" data-target="settings-font" data-i18n="navFont">字体</button>
+                <button class="settings-nav-chip" type="button" data-target="settings-color" data-i18n="navColor">配色</button>
+                <button class="settings-nav-chip" type="button" data-target="settings-shortcuts" data-i18n="navShortcuts">按键</button>
+                <button class="settings-nav-chip" type="button" data-target="settings-cloud" data-i18n="navCloud">云备份</button>
+              </nav>
             </div>
-            <label class="settings-switch">
-              <input id="show-stats" type="checkbox" />
-              <span data-i18n="readerManageShowStats">显示统计信息</span>
-            </label>
-            <section class="settings-section">
+            <section id="settings-general" class="settings-section is-first">
+              <label class="settings-switch">
+                <input id="show-stats" type="checkbox" />
+                <span data-i18n="readerManageShowStats">显示统计信息</span>
+              </label>
+            </section>
+            <section id="settings-backup" class="settings-section">
               <div class="section-head">
                 <p class="panel-label" data-i18n="readerBackup">Backup</p>
               </div>
@@ -198,7 +210,7 @@
                 <button id="reset-data" type="button" data-i18n="readerResetAction">Reset selected items</button>
               </div>
             </section>
-            <section class="settings-section">
+            <section id="settings-font" class="settings-section">
               <div class="section-head">
                 <p class="panel-label" data-i18n="sectionCustomFont">自定义字体</p>
               </div>
@@ -211,11 +223,15 @@
               </label>
               <p id="font-preview" class="font-preview" data-i18n="lblFontPreview">预览：窗含西岭千秋雪</p>
             </section>
-            <section class="settings-section">
+            <section id="settings-color" class="settings-section">
               <div class="section-head">
                 <p class="panel-label" data-i18n="sectionTemplateColor">Template Color</p>
               </div>
               <p class="file-meta" data-i18n="templateColorHint">选择“自定义”主题后即可调整下列颜色（留空则沿用对应预设）。</p>
+              <p id="color-locked-hint" class="color-locked-hint hidden">
+                <span data-i18n="warnColorLocked">当前主题不是“自定义”，颜色不可调整。</span>
+                <button id="switch-to-custom" type="button" class="small-button" data-i18n="btnSwitchToCustom">切换为自定义主题</button>
+              </p>
               <div id="theme-color-grid" class="color-grid">
                 <label><span data-i18n="lblBgColor">背景</span><input type="color" class="color-input" data-color-key="bgColor" /></label>
                 <label><span data-i18n="lblSurfaceColor">纸面</span><input type="color" class="color-input" data-color-key="surfaceColor" /></label>
@@ -229,7 +245,7 @@
                 <button id="reset-colors" type="button" class="small-button" data-i18n="btnResetColors">重置颜色</button>
               </div>
             </section>
-            <section class="settings-section">
+            <section id="settings-shortcuts" class="settings-section">
               <div class="section-head">
                 <p class="panel-label" data-i18n="sectionShortcuts">Keyboard Shortcuts</p>
                 <button id="reset-keys" type="button" class="small-button" data-i18n="btnResetKeys">恢复默认</button>
@@ -237,35 +253,39 @@
               <p id="key-rebind-hint" class="file-meta" data-i18n="actRebindingHint">点击「重新绑定」后按下新组合键；按 Esc 取消。Tab / Space / 方向键允许但会提示系统语义。</p>
               <div id="shortcut-list" class="shortcut-list"></div>
             </section>
-            <section id="cloud-section" class="settings-section">
-              <div class="section-head">
-                <p class="panel-label" data-i18n="readerCloudBackup">云备份</p>
+            <section id="settings-cloud" class="settings-section">
+              <button id="cloud-section-toggle" class="settings-section-toggle" type="button" aria-expanded="false" aria-controls="cloud-section-body">
+                <span class="panel-label" data-i18n="readerCloudBackup">云备份</span>
                 <span id="cloud-status-badge" class="status-badge" title="未连接" data-i18n-attr="title:readerCloudNeedConfig">◦</span>
+                <span class="section-toggle-hint" data-i18n="cloudExpand">展开</span>
+                <span class="section-toggle-chevron" aria-hidden="true"></span>
+              </button>
+              <div id="cloud-section-body" class="settings-collapsible is-collapsed">
+                <div class="cloud-config">
+                  <label class="cloud-config-item">
+                    <span data-i18n="readerCloudGistId">Gist ID</span>
+                    <input id="cloud-gist-id" type="text" placeholder="e.g. a1b2c3d4..." autocomplete="off" data-i18n-attr="placeholder:readerCloudGistIdPlaceholder" />
+                  </label>
+                  <label class="cloud-config-item">
+                    <span data-i18n="readerCloudToken">Token</span>
+                    <div class="token-row">
+                      <input id="cloud-gist-token" type="password" placeholder="GitHub Personal Access Token" autocomplete="off" data-i18n-attr="placeholder:readerCloudTokenPlaceholder" />
+                      <button id="cloud-token-toggle" type="button" class="small-button" data-i18n="readerCloudToggleTokenShow">显示</button>
+                    </div>
+                  </label>
+                  <p class="file-meta cloud-token-note" data-i18n="readerCloudTokenRequirement">Token 需要具备 Gist 写入权限（经典 token 选 gist，或细粒度 token 授予 gist 访问）。</p>
+                </div>
+                <div class="action-row">
+                  <button id="cloud-connect" type="button" data-i18n="readerCloudConnect">连接 Gist</button>
+                  <button id="cloud-sync" type="button" disabled data-i18n="readerCloudSync">同步</button>
+                </div>
+                <div id="cloud-backups-container" class="hidden">
+                  <p class="panel-label cloud-backups-title" data-i18n="readerCloudBackups">云备份列表</p>
+                  <div id="cloud-backups-list" class="list"></div>
+                  <p id="cloud-quota" class="file-meta cloud-quota"></p>
+                </div>
+                <p id="cloud-status" class="file-meta" data-i18n="readerCloudStatusHint">填写你自己的 Gist ID 和 Token，备份写入你的 Gist</p>
               </div>
-              <div class="cloud-config">
-                <label class="cloud-config-item">
-                  <span data-i18n="readerCloudGistId">Gist ID</span>
-                  <input id="cloud-gist-id" type="text" placeholder="e.g. a1b2c3d4..." autocomplete="off" data-i18n-attr="placeholder:readerCloudGistIdPlaceholder" />
-                </label>
-                <label class="cloud-config-item">
-                  <span data-i18n="readerCloudToken">Token</span>
-                  <div class="token-row">
-                    <input id="cloud-gist-token" type="password" placeholder="GitHub Personal Access Token" autocomplete="off" data-i18n-attr="placeholder:readerCloudTokenPlaceholder" />
-                    <button id="cloud-token-toggle" type="button" class="small-button" data-i18n="readerCloudToggleTokenShow">显示</button>
-                  </div>
-                </label>
-                <p class="file-meta cloud-token-note" data-i18n="readerCloudTokenRequirement">Token 需要具备 Gist 写入权限（经典 token 选 gist，或细粒度 token 授予 gist 访问）。</p>
-              </div>
-              <div class="action-row">
-                <button id="cloud-connect" type="button" data-i18n="readerCloudConnect">连接 Gist</button>
-                <button id="cloud-sync" type="button" disabled data-i18n="readerCloudSync">同步</button>
-              </div>
-              <div id="cloud-backups-container" class="hidden">
-                <p class="panel-label cloud-backups-title" data-i18n="readerCloudBackups">云备份列表</p>
-                <div id="cloud-backups-list" class="list"></div>
-                <p id="cloud-quota" class="file-meta cloud-quota"></p>
-              </div>
-              <p id="cloud-status" class="file-meta" data-i18n="readerCloudStatusHint">填写你自己的 Gist ID 和 Token，备份写入你的 Gist</p>
             </section>
           </div>
         </div>

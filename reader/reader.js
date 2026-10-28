@@ -22,14 +22,26 @@ import {
   saveProgress,
   saveReaderSettings
 } from "../modules/storage.js";
+import { READER_ACTIONS, formatActionBindings, matchKeyBinding } from "../modules/keyboard-map.js";
 import {
-  DEFAULT_KEYBINDINGS,
-  READER_ACTIONS,
-  detectKeybindingConflict,
-  eventToBinding,
-  formatActionBindings,
-  matchKeyBinding
-} from "../modules/keyboard-map.js";
+  COLOR_KEYS,
+  COLOR_VAR_MAP,
+  DERIVED_VAR_ALPHA,
+  captureCurrentPalette,
+  contrastRatio,
+  createPaletteCache,
+  getEffectiveFont,
+  parseHex,
+  hexToRgba,
+  isFontFamilyValueSafe,
+  relativeLuminance,
+  shiftHex,
+  toColorInputValue
+} from "./reader-color.js";
+import { ACTION_LABEL_KEY, createSettingsPanel } from "./reader-settings-panel.js";
+
+// 预设主题调色板采样一次即可复用，避免高频重绘时反复测量
+const presetPaletteCache = createPaletteCache();
 
 const state = {
   settings: getDefaultSettings(),
@@ -137,10 +149,15 @@ const elements = {
   fontPreview: document.getElementById("font-preview"),
   themeColorGrid: document.getElementById("theme-color-grid"),
   contrastWarning: document.getElementById("contrast-warning"),
+  colorLockedHint: document.getElementById("color-locked-hint"),
+  switchToCustom: document.getElementById("switch-to-custom"),
   resetColors: document.getElementById("reset-colors"),
   resetKeys: document.getElementById("reset-keys"),
   shortcutList: document.getElementById("shortcut-list"),
-  shortcutHelpList: document.getElementById("shortcut-help-list")
+  shortcutHelpList: document.getElementById("shortcut-help-list"),
+  settingsNav: document.getElementById("settings-nav"),
+  cloudSectionToggle: document.getElementById("cloud-section-toggle"),
+  cloudSectionBody: document.getElementById("cloud-section-body")
 };
 
 let resizeTimer = null;
@@ -148,6 +165,17 @@ let modeHintTimer = null;
 let warmupTimer = null;
 let shortcutsOpen = false;
 let settingsOpen = false;
+
+const settingsPanel = createSettingsPanel({
+  elements,
+  t,
+  getKeybindings: () => state.settings.keybindings,
+  setKeybindings: (keybindings) => {
+    state.settings = { ...state.settings, keybindings };
+    saveReaderSettings(state.settings).catch(() => {});
+  },
+  isOpen: () => settingsOpen
+});
 
 function requestWarmupWork(callback) {
   if (typeof window.requestIdleCallback === "function") {
@@ -601,7 +629,9 @@ function refreshI18nUi() {
 
   // 动态生成的动作名/键位文案随语言切换刷新
   if (shortcutsOpen) renderShortcutHelp();
-  if (settingsOpen) renderShortcutList();
+  if (settingsOpen) settingsPanel.refreshShortcutList();
+  // 折叠分区的「展开/收起」提示由 JS 维护，需在 i18n 重刷后按当前状态回写
+  settingsPanel.setCloudExpanded(settingsPanel.isCloudExpanded());
 }
 
 const GIST_CONFIG_KEY = "gistCloudConfig";
@@ -1053,10 +1083,9 @@ function setShortcutsOverlay(open) {
 
 function setSettingsOverlay(open) {
   settingsOpen = open;
-  if (open) {
-    renderShortcutList();
-  }
   elements.settingsOverlay?.classList.toggle("hidden", !open);
+  if (!open) return;
+  settingsPanel.prepareOpen();
 }
 
 function renderLibrary() {
@@ -1140,87 +1169,6 @@ function renderBookmarks() {
   }
 }
 
-// 仅 6 个不透明实色可由用户调整；边框/纸影由正文色按低透明度派生
-const COLOR_KEYS = ["bgColor", "surfaceColor", "textColor", "mutedColor", "accentColor", "accentStrong"];
-const COLOR_VAR_MAP = {
-  bgColor: "--bg-color",
-  surfaceColor: "--surface-color",
-  textColor: "--text-color",
-  mutedColor: "--muted-color",
-  accentColor: "--accent-color",
-  accentStrong: "--accent-strong"
-};
-const DERIVED_VAR_ALPHA = {
-  "--border-color": 0.22,
-  "--surface-shadow": 0.18
-};
-// 仅允许字体族常见字符，拒绝 < > ; @ 与 url() 等可能注入/破坏布局的内容。
-const FONT_FAMILY_SAFE = /^[A-Za-z0-9 ,."'_()-]+$/;
-
-function isFontFamilyValueSafe(value) {
-  if (typeof value !== "string" || value.trim() === "") return false;
-  if (/[<>;@]/.test(value) || /url\(/i.test(value)) return false;
-  return FONT_FAMILY_SAFE.test(value.trim());
-}
-
-function getEffectiveFont(settings) {
-  const custom = settings.customFont;
-  if (custom && isFontFamilyValueSafe(custom)) {
-    return custom;
-  }
-  return settings.fontFamily;
-}
-
-function toColorInputValue(hex) {
-  return typeof hex === "string" && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : "#000000";
-}
-
-function rgbStringToHex(value) {
-  const m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(value || "");
-  if (!m) return "";
-  return `#${[1, 2, 3].map((i) => Number(m[i]).toString(16).padStart(2, "0")).join("")}`;
-}
-
-// 读取当前生效的调色板（用于切入自定义主题时以现有观感为起点）
-function captureCurrentPalette() {
-  const probe = document.createElement("span");
-  probe.style.display = "none";
-  document.body.append(probe);
-  const palette = {};
-  for (const key of COLOR_KEYS) {
-    probe.style.color = `var(${COLOR_VAR_MAP[key]})`;
-    palette[key] = rgbStringToHex(getComputedStyle(probe).color);
-  }
-  probe.remove();
-  return palette;
-}
-
-function parseHex(hex) {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
-  if (!m) return null;
-  const int = parseInt(m[1], 16);
-  return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 };
-}
-
-function relativeLuminance({ r, g, b }) {
-  const channel = (c) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-}
-
-function contrastRatio(hexA, hexB) {
-  const a = parseHex(hexA);
-  const b = parseHex(hexB);
-  if (!a || !b) return null;
-  const la = relativeLuminance(a);
-  const lb = relativeLuminance(b);
-  const lighter = Math.max(la, lb);
-  const darker = Math.min(la, lb);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
 function applyFontSettings() {
   const effective = getEffectiveFont(state.settings);
   document.documentElement.style.setProperty("--font-family", effective);
@@ -1235,21 +1183,6 @@ function applyFontSettings() {
   if (elements.fontPreview) elements.fontPreview.style.fontFamily = effective;
 }
 
-function hexToRgba(hex, alpha) {
-  const rgb = parseHex(hex);
-  if (!rgb) return "";
-  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
-}
-
-// 按比例把颜色推向黑/白，用于由主色派生出外壳渐变的第二色
-function shiftHex(hex, amount) {
-  const rgb = parseHex(hex);
-  if (!rgb) return "";
-  const target = amount < 0 ? 0 : 255;
-  const mix = Math.abs(amount);
-  const channel = (c) => Math.round(c + (target - c) * mix);
-  return `#${[rgb.r, rgb.g, rgb.b].map((c) => channel(c).toString(16).padStart(2, "0")).join("")}`;
-}
 
 function applyTheme() {
   const { theme, themeColors } = state.settings;
@@ -1308,12 +1241,19 @@ function applyTheme() {
 
   const isCustom = theme === "custom";
   if (elements.themeColorGrid) {
+    // 非自定义主题也回填当前预设的真实颜色：否则取色器一片灰，看起来像坏掉的控件
+    const presetPalette = isCustom ? null : presetPaletteCache.get(theme);
     elements.themeColorGrid.querySelectorAll(".color-input").forEach((input) => {
       const key = input.dataset.colorKey;
-      input.value = toColorInputValue(state.settings.themeColors?.[key]);
+      const rawValue = isCustom ? state.settings.themeColors?.[key] : presetPalette[key];
+      input.value = toColorInputValue(rawValue);
       input.disabled = !isCustom;
+      input.title = isCustom ? "" : t("warnColorLocked");
     });
   }
+  // 非自定义主题时明确告知原因并给出一步到位的入口，避免取色器一片灰让人以为坏了。
+  elements.colorLockedHint?.classList.toggle("hidden", isCustom);
+  elements.themeColorGrid?.classList.toggle("is-locked", !isCustom);
   if (elements.contrastWarning) elements.contrastWarning.classList.add("hidden");
 }
 
@@ -1921,19 +1861,6 @@ const EMPTY_THEME_COLORS = {
   accentStrong: ""
 };
 
-const ACTION_LABEL_KEY = {
-  nextChapter: "actNextChapter",
-  prevChapter: "actPrevChapter",
-  nextPage: "actNextPage",
-  prevPage: "actPrevPage",
-  scrollLineDown: "actScrollLineDown",
-  scrollLineUp: "actScrollLineUp",
-  bookmark: "actBookmark",
-  togglePanel: "actTogglePanel",
-  toggleDebug: "actToggleDebug",
-  openShortcuts: "actOpenShortcuts",
-  closeShortcuts: "actCloseShortcuts"
-};
 
 function renderShortcutHelp() {
   if (!elements.shortcutHelpList) return;
@@ -1952,79 +1879,7 @@ function renderShortcutHelp() {
   }
 }
 
-function renderShortcutList() {
-  if (!elements.shortcutList) return;
-  elements.shortcutList.innerHTML = "";
-  for (const action of READER_ACTIONS) {
-    if (action === "closeShortcuts") continue; // Escape 关闭浮层不可重绑
-    const row = document.createElement("div");
-    row.className = "shortcut-row";
-    const label = document.createElement("span");
-    label.className = "shortcut-label";
-    label.textContent = t(ACTION_LABEL_KEY[action] || action);
-    const keyBtn = document.createElement("button");
-    keyBtn.type = "button";
-    keyBtn.className = "shortcut-key";
-    // 展示全部绑定；重绑会整体替换为该动作的新键位，用 title 说明，避免用户误以为会追加。
-    const keys = formatActionBindings(state.settings.keybindings, action);
-    keyBtn.textContent = keys || "—";
-    keyBtn.title = t("shortcutRebindHint");
-    keyBtn.addEventListener("click", () => startRebindCapture(action, keyBtn));
-    row.append(label, keyBtn);
-    elements.shortcutList.append(row);
-  }
-}
 
-let rebindState = null;
-function startRebindCapture(action, buttonEl) {
-  if (rebindState) {
-    rebindState.cleanup();
-  }
-  buttonEl.textContent = "…";
-  buttonEl.classList.add("capturing");
-
-  const cleanup = () => {
-    document.removeEventListener("keydown", handler, true);
-    buttonEl.classList.remove("capturing");
-    rebindState = null;
-    buttonEl.textContent = formatActionBindings(state.settings.keybindings, action) || "—";
-  };
-
-  const handler = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.key === "Escape") {
-      cleanup();
-      return;
-    }
-    const binding = eventToBinding(event);
-    const conflict = detectKeybindingConflict(action, binding, state.settings.keybindings);
-    if (conflict) {
-      buttonEl.textContent = t("warnKeyConflict", { action: t(ACTION_LABEL_KEY[conflict] || conflict) });
-      cleanup();
-      return;
-    }
-    state.settings = {
-      ...state.settings,
-      keybindings: { ...state.settings.keybindings, [action]: [binding] }
-    };
-    cleanup();
-    renderShortcutList();
-    saveReaderSettings(state.settings).catch(() => {});
-  };
-
-  rebindState = { cleanup };
-  document.addEventListener("keydown", handler, true);
-}
-
-function resetKeybindings() {
-  state.settings = {
-    ...state.settings,
-    keybindings: JSON.parse(JSON.stringify(DEFAULT_KEYBINDINGS))
-  };
-  renderShortcutList();
-  saveReaderSettings(state.settings).catch(() => {});
-}
 
 function resetColors() {
   state.settings = {
@@ -2132,6 +1987,7 @@ function dispatchReaderAction(action) {
 }
 
 function bindEvents() {
+  settingsPanel.init();
   elements.fileInput.addEventListener("change", handleFileSelection);
   elements.exportBackup.addEventListener("click", () => {
     handleExportBackup();
@@ -2242,7 +2098,11 @@ function bindEvents() {
   elements.customFont?.addEventListener("input", applyCustomFontChange);
   elements.useCustomFont?.addEventListener("change", applyCustomFontChange);
   elements.resetColors?.addEventListener("click", resetColors);
-  elements.resetKeys?.addEventListener("click", resetKeybindings);
+  elements.resetKeys?.addEventListener("click", () => settingsPanel.resetKeys());
+  elements.switchToCustom?.addEventListener("click", async () => {
+    elements.themeSelect.value = "custom";
+    await handleSettingsChange();
+  });
   elements.themeColorGrid?.querySelectorAll(".color-input").forEach((input) => {
     input.addEventListener("input", handleColorInputChange);
   });

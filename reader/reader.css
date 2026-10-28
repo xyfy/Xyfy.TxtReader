@@ -560,8 +560,127 @@ body.is-immersive .paper-page {
   gap: 8px;
 }
 
-.settings-card {
+/* 双类选择器：需要压过后面定义的 .overlay-card 内边距 */
+.overlay-card.settings-card {
   width: min(680px, calc(100vw - 32px));
+  /* 分区定位以卡片为参照：JS 用 offsetTop 计算滚动位置 */
+  position: relative;
+  /* 内边距下放到吸顶容器与各分区，避免负 margin 撑破滚动容器 */
+  padding: 0;
+}
+
+/* 设置面板内统一 border-box：否则 width:100% 的输入框会被内边距与边框撑出卡片 */
+.overlay-card.settings-card,
+.overlay-card.settings-card * {
+  box-sizing: border-box;
+}
+
+/* ===== 吸顶区：标题 + 快捷导航 ===== */
+.settings-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 20px 20px 0;
+  background: var(--surface-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+
+.settings-nav-chip {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--muted-color);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.settings-nav-chip:hover {
+  color: var(--text-color);
+  border-color: var(--accent-color);
+}
+
+.settings-nav-chip.is-active {
+  color: #fffaf0;
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+}
+
+.settings-nav-chip:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* ===== 可折叠分区（云备份） ===== */
+.settings-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.settings-section-toggle .panel-label {
+  margin: 0;
+}
+
+.settings-section-toggle:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.section-toggle-hint {
+  margin-left: auto;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--muted-color);
+}
+
+.section-toggle-chevron {
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-right: 2px solid var(--muted-color);
+  border-bottom: 2px solid var(--muted-color);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease, margin 0.2s ease;
+}
+
+.settings-section-toggle[aria-expanded="true"] .section-toggle-chevron {
+  margin-top: 2px;
+  transform: rotate(-135deg);
+}
+
+.settings-collapsible {
+  margin-top: 12px;
+}
+
+.settings-collapsible.is-collapsed {
+  display: none;
+}
+
+.settings-section.is-first {
+  margin-top: 12px;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .settings-grid {
@@ -595,8 +714,13 @@ body.is-immersive .paper-page {
 
 .settings-section {
   margin-top: 16px;
-  padding-top: 12px;
+  padding: 12px 20px 0;
   border-top: 1px solid var(--border-color);
+}
+
+/* 卡片内边距下放后，最后一块负责收住底部留白 */
+.settings-card > .settings-section:last-child {
+  padding-bottom: 20px;
 }
 
 .color-grid {
@@ -623,11 +747,52 @@ body.is-immersive .paper-page {
   border-radius: 8px;
   background: transparent;
   cursor: pointer;
+  /* 清掉浏览器原生外观，否则色块会被内边距与斜角挤成一条细缝，看起来像灰块 */
+  -webkit-appearance: none;
+  appearance: none;
+  overflow: hidden;
+}
+
+.color-grid input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-grid input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+
+.color-grid input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 6px;
 }
 
 .color-grid input[type="color"]:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* 锁定态保留真实色相，仅降低存在感：灰度滤镜会让色块看起来像坏掉的控件 */
+.color-grid.is-locked input[type="color"] {
+  opacity: 0.6;
+}
+
+.color-locked-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-color);
+  background: var(--panel-wash, rgba(255, 196, 122, 0.18));
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.color-locked-hint.hidden {
+  display: none;
 }
 
 .color-warning {
@@ -672,6 +837,13 @@ body.is-immersive .paper-page {
   font-family: var(--font-family);
   font-size: 15px;
   line-height: 1.7;
+}
+
+.shortcut-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+  margin-top: 10px;
 }
 
 .shortcut-row {
@@ -736,7 +908,7 @@ body.is-immersive .paper-page {
   color: #f44336;
 }
 
-#cloud-section .action-row button:disabled {
+#settings-cloud .action-row button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -1009,6 +1181,20 @@ body.is-immersive .immersive-exit.hidden {
   }
 
   .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .settings-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shortcut-list {
     grid-template-columns: 1fr;
   }
 }

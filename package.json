@@ -1,6 +1,6 @@
 {
   "name": "xyfy-txt-reader",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,12 +8,16 @@
     "build:webapp": "node scripts/build-webapp.mjs",
     "lint": "eslint .",
     "gen:icons": "node scripts/gen-icons.mjs",
-    "test": "npm run test:paginator && npm run test:backup && npm run test:storage-sync && npm run test:keyboard && npm run test:cloud-provider",
+    "test": "npm run test:paginator && npm run test:backup && npm run test:storage-sync && npm run test:keyboard && npm run test:site-parity && npm run test:settings-panel && npm run test:color && npm run test:settings-panel-api && npm run test:cloud-provider",
     "test:paginator": "node tests/paginator.test.mjs",
     "test:backup": "node tests/backup.test.mjs",
     "test:storage-sync": "node tests/storage-sync.test.mjs",
     "test:keyboard": "node tests/keyboard-map.test.mjs",
-    "test:cloud-provider": "node tests/cloud-provider.test.mjs"
+    "test:cloud-provider": "node tests/cloud-provider.test.mjs",
+    "test:site-parity": "node tests/site-parity.test.mjs",
+    "test:settings-panel": "node tests/settings-panel.test.mjs",
+    "test:color": "node tests/reader-color.test.mjs",
+    "test:settings-panel-api": "node tests/reader-settings-panel.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
