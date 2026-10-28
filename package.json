@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:zip": "rm -f dist/xyfy-txt-reader-v$npm_package_version.zip && mkdir -p dist && zip -r dist/xyfy-txt-reader-v$npm_package_version.zip . -x 'dist/*' '.git/*' '.github/*' 'node_modules/*' 'tests/*' 'docs/*' 'scripts/*' '*.DS_Store'",
+    "build:zip": "rm -f dist/xyfy-txt-reader-v$npm_package_version.zip && mkdir -p dist && zip -r dist/xyfy-txt-reader-v$npm_package_version.zip . -x 'dist/*' '.git/*' '.github/*' '.vscode/*' 'node_modules/*' 'tests/*' 'docs/*' 'scripts/*' 'web/*' 'eslint.config.js' 'package-lock.json' 'tag-release.sh' 'package.json' '*.DS_Store'",
     "build:webapp": "node scripts/build-webapp.mjs",
     "lint": "eslint .",
     "gen:icons": "node scripts/gen-icons.mjs",

@@ -5,7 +5,7 @@ Chrome 和 Edge 可用的 TXT 小说阅读扩展，面向本地小说阅读场�
 ## 插件信息
 
 - 名称：Xyfy TXT Reader
-- 版本：0.3.0
+- 版本：0.4.0
 - 形态：Manifest V3 扩展
 - 平台：Chrome / Edge
 - 数据策略：正文保存在 IndexedDB，轻量设置与进度可镜像到 `chrome.storage.sync`
@@ -16,13 +16,14 @@ Chrome 和 Edge 可用的 TXT 小说阅读扩展，面向本地小说阅读场�
 - DOM 实测分页，双页书本模式与自适应单页降级
 - 单页滚动模式，支持整屏滚动与小步滚动
 - 页面内沉浸模式，隐藏侧栏与控制区专注阅读
-- 左右方向键切换章节，空格/Shift+空格翻页
 - 书签、最近阅读列表、阅读统计面板
-- 快捷键帮助浮层
 - JSON 备份导出 / 导入恢复
 - `chrome.storage.sync` 轻量同步设置与阅读进度
 - 云备份（用户自填 Gist ID + Token）
 - 大章节增量分页、章节分页缓存、空闲时后台预热
+- **自定义快捷键**：设置面板内逐项重绑，键位冲突实时拦截，可一键恢复默认；快捷键帮助浮层按当前键位动态生成
+- **自定义模板颜色**：主题新增「自定义」，可单独调整背景、纸面、正文、次要、强调、强强调 6 个颜色，正文与背景/纸面对比度过低时给出可读性提示
+- **自定义字体**：内置预设之外可填写任意字体栈，带字符集安全校验、实时预览与非法值回退
 
 ## 本地运行
 
@@ -49,8 +50,9 @@ Chrome 和 Edge 可用的 TXT 小说阅读扩展，面向本地小说阅读场�
 ### 一键打包
 
 1. 安装依赖（如需）：`npm install`
-2. 执行测试：`npm test`
-3. 生成发布包：`npm run build:zip`
+2. 执行代码检查：`npm run lint`
+3. 执行测试：`npm test`
+4. 生成发布包：`npm run build:zip`
 
 执行后会在 `dist` 目录下生成：
 
@@ -59,15 +61,17 @@ Chrome 和 Edge 可用的 TXT 小说阅读扩展，面向本地小说阅读场�
 说明：
 
 - ZIP 根目录就是扩展根目录（`manifest.json` 在压缩包根层级）
-- 已自动排除 `tests`、`docs`、`.git`、`node_modules`、`dist`
+- 已自动排除开发与构建文件：`tests`、`docs`、`scripts`、`web`、`node_modules`、`.git`、`.github`、`.vscode`、`dist`，以及 `eslint.config.js`、`package-lock.json`、`tag-release.sh`
+- 该 ZIP 同时适用于 Chrome Web Store 与 Edge Add-ons，无需分别打包
 
 ### 发布前检查清单
 
-- `manifest.json` 里的 `version` 已递增
-- 图标与商店截图已准备（建议至少 128x128 图标）
+- `manifest.json` 里的 `version` 已递增（且与 `package.json` 保持一致）
+- `npm run lint` 与 `npm test` 均通过
+- 图标与商店截图已准备（至少 128x128 图标 + 1280x800 截图）
 - 权限最小化（默认仅 `storage`，GitHub API 主机权限在“连接 Gist”时按需申请）
-- 已验证升级安装后的阅读进度与设置兼容性
-- 隐私政策链接已准备：`https://xyfy.github.io/Xyfy.TxtReader/privacy-policy.html`
+- 已验证升级安装后的阅读进度与设置兼容性（旧版本设置项会被自动补全默认值）
+- 隐私政策链接可正常打开：`https://xyfy.github.io/Xyfy.TxtReader/privacy-policy.html`
 - 商店文案素材可直接使用：`docs/store-listing.md`
 
 ### GitHub Pages 隐私政策链接启用
@@ -77,6 +81,8 @@ Chrome 和 Edge 可用的 TXT 小说阅读扩展，面向本地小说阅读场�
 3. Source 选择 `Deploy from a branch`。
 4. Branch 选择 `main`，目录选择 `/ (root)`，保存。
 5. 等待 Pages 发布完成后，使用：`https://xyfy.github.io/Xyfy.TxtReader/privacy-policy.html`
+
+> 注意：如果 Pages 里配置过自定义域名，`*.github.io` 会被 301 重定向到该域名。自定义域名一旦过期，隐私政策链接会直接失效（商店审核会因此拒绝）。此时需到 Settings -> Pages 清空 Custom domain 后再验证。
 
 ### Chrome Web Store 发布
 
@@ -100,21 +106,28 @@ Chrome 和 Edge 可用的 TXT 小说阅读扩展，面向本地小说阅读场�
 
 ## 常用快捷键
 
-- `← / →`：切换章节
-- `Space`：书本模式下一页；滚动模式下滚一整屏
-- `Shift + Space`：书本模式上一页；滚动模式上滚一整屏或回上一章
-- `↑ / ↓`：单页滚动模式下小步滚动
-- `B`：添加书签
-- `Tab`：显示 / 隐藏左侧栏
-- `H` 或 `?`：打开快捷键帮助浮层
-- `Alt + D`：切换分页调试面板
-- `Esc`：关闭快捷键帮助浮层
+默认键位如下，**除 `Esc` 外均可在「设置 → 快捷键」中重绑**，重绑后快捷键帮助浮层会自动同步。
+
+| 操作 | 默认键位 |
+|------|----------|
+| 下一章 | `→` 或 `[` |
+| 上一章 | `←` 或 `]` |
+| 下一页（书本模式）/ 向下滚一屏（滚动模式） | `Space` |
+| 上一页（书本模式）/ 向上滚一屏（滚动模式） | `Shift + Space` |
+| 小步下滚 / 上滚（滚动模式） | `↓` / `↑` |
+| 添加书签 | `B` |
+| 显示 / 隐藏左侧栏 | `Tab` |
+| 打开快捷键帮助 | `H` 或 `?` |
+| 分页调试面板 | `Alt + D` |
+| 关闭浮层 | `Esc`（固定键位，不可重绑） |
 
 ## 当前目录
 
 - popup: 扩展弹窗
 - reader: 阅读器页面与交互逻辑
 - background: MV3 service worker
-- modules: 核心模块（解析、分页、备份、存储）
-- tests: 分页、备份、同步、云备份抽象层测试
-- docs: 规划文档
+- modules: 核心模块（解析、分页、备份、存储、快捷键映射、i18n）
+- web: 站点版入口（由 `npm run build:webapp` 生成，不参与扩展打包）
+- tests: 分页、备份、同步、快捷键映射、云备份抽象层测试
+- docs: 商店素材与规划文档
+- scripts: 打包与图标生成脚本
