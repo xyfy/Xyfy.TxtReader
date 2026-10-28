@@ -62,7 +62,7 @@
     <main class="wrap">
       <article class="card">
         <h1>Xyfy TXT Reader 隐私政策</h1>
-        <p class="meta">生效日期：2026-03-28</p>
+        <p class="meta">生效日期：2026-10-28（上次更新：2026-03-28）</p>
 
         <p>
           Xyfy TXT Reader（以下简称“本扩展”）尊重并保护用户隐私。本政策说明本扩展会收集、处理和存储哪些数据，以及这些数据如何被使用。
@@ -90,34 +90,55 @@
         </ul>
 
         <h2>4. 权限说明</h2>
-        <p>
-          本扩展申请 <code>storage</code> 权限用于保存阅读数据。
-        </p>
+        <ul>
+          <li><code>storage</code>：用于保存阅读进度、书签、阅读设置等本地数据。</li>
+          <li><code>permissions</code>：仅在用户点击“连接 Gist”时，按需申请 GitHub API 访问权限，安装时不预先获取。</li>
+          <li>可选主机权限 <code>https://api.github.com/*</code>：仅用于向用户自己的 Gist 读写备份文件。</li>
+        </ul>
         <p>
           云备份占用的是用户自己的 Gist 存储，不占用开发者存储。
         </p>
 
-        <h2>5. 数据导出与删除</h2>
+        <h2>5. 凭证（Token）处理</h2>
         <ul>
-          <li>用户可使用扩展内备份导出功能导出阅读数据。</li>
-          <li>用户可通过清除扩展数据或卸载扩展删除本地数据。</li>
+          <li>如用户启用 Gist 云备份，需自行填写 GitHub 个人访问令牌（Token）。</li>
+          <li>该 Token 仅保存在用户本机浏览器存储中，不会上传至开发者服务器或任何第三方。</li>
+          <li>该 Token 仅用于代表用户本人调用 GitHub API，读写用户指定的 Gist。</li>
+          <li>用户可随时在阅读器中断开连接或清除数据，Token 随之删除。</li>
         </ul>
 
-        <h2>6. 政策更新</h2>
+        <h2>6. 数据保留期限</h2>
+        <ul>
+          <li>本地数据（正文、进度、书签、设置）：保留至用户主动删除或卸载扩展为止，开发者不设自动过期。</li>
+          <li>浏览器同步数据（<code>chrome.storage.sync</code>）：保留至用户关闭同步或删除同步数据为止。</li>
+          <li>Gist 备份文件：保留在用户自己的 GitHub 账号中，期限由用户自行管理。</li>
+          <li>用户卸载扩展后，本地存储与扩展数据由浏览器清除；Gist 中的备份文件需用户自行在 GitHub 删除。</li>
+        </ul>
+
+        <h2>7. 用户权利</h2>
+        <ul>
+          <li><strong>访问与导出</strong>：通过扩展内“导出备份”功能，可随时导出全部阅读数据为 JSON 文件。</li>
+          <li><strong>更正</strong>：阅读设置与进度可在扩展内直接修改。</li>
+          <li><strong>删除</strong>：通过扩展内数据重置功能、清除扩展数据或卸载扩展删除本地数据。</li>
+          <li><strong>响应方式</strong>：如对数据处理有疑问或需协助删除，可通过下方联系方式提出，通常在 7 个工作日内回复。</li>
+        </ul>
+
+        <h2>8. 政策更新</h2>
         <p>
           当功能或数据处理方式发生变化时，本页面会同步更新并标注新的生效日期。
         </p>
 
-        <h2>7. 联系方式</h2>
-        <p>
-          如对本政策有问题，请在项目仓库提交 Issue：
-          <a href="https://github.com/xyfy/Xyfy.TxtReader/issues">https://github.com/xyfy/Xyfy.TxtReader/issues</a>
-        </p>
+        <h2>9. 联系方式</h2>
+        <ul>
+          <li>开发者：Xyfy TXT Reader 项目维护者（GitHub 账号 <a href="https://github.com/xyfy">xyfy</a>）</li>
+          <li>问题反馈：<a href="https://github.com/xyfy/Xyfy.TxtReader/issues">https://github.com/xyfy/Xyfy.TxtReader/issues</a></li>
+          <li>隐私相关请求：请在上方 Issue 中标注“privacy”，以便优先处理。</li>
+        </ul>
 
         <hr class="lang-divider" />
 
         <h1>Privacy Policy (English)</h1>
-        <p class="meta">Effective date: 2026-03-28</p>
+        <p class="meta">Effective date: 2026-10-28 (last updated: 2026-03-28)</p>
 
         <p>
           Xyfy TXT Reader (the "Extension") respects your privacy. This policy explains what data is processed and where it is stored.
@@ -145,29 +166,50 @@
         </ul>
 
         <h2>4. Permission Usage</h2>
-        <p>
-          The extension requests <code>storage</code> for reading data.
-        </p>
+        <ul>
+          <li><code>storage</code>: saves reading progress, bookmarks and display settings locally.</li>
+          <li><code>permissions</code>: used only to request the GitHub API host permission at runtime, after the user clicks "Connect Gist". It is not requested at install time.</li>
+          <li>Optional host permission <code>https://api.github.com/*</code>: used only to read and write backup files in the user's own Gist.</li>
+        </ul>
         <p>
           Cloud backups use your own Gist storage, not developer-owned storage.
         </p>
 
-        <h2>5. Data Export and Deletion</h2>
+        <h2>5. Token Handling</h2>
         <ul>
-          <li>You can export reading data using the built-in backup feature.</li>
-          <li>You can delete data by clearing extension storage or uninstalling the extension.</li>
+          <li>If you enable Gist cloud backup, you provide your own GitHub personal access token.</li>
+          <li>The token is stored only in your local browser storage. It is never sent to the developer or any third party.</li>
+          <li>The token is used solely to call the GitHub API on your behalf, against the Gist you specify.</li>
+          <li>You can disconnect or clear your data at any time in the reader, which removes the token.</li>
         </ul>
 
-        <h2>6. Policy Updates</h2>
+        <h2>6. Data Retention</h2>
+        <ul>
+          <li>Local data (text, progress, bookmarks, settings): retained until you delete it or uninstall the extension. The developer sets no automatic expiry.</li>
+          <li>Browser sync data (<code>chrome.storage.sync</code>): retained until you turn off sync or delete the synced data.</li>
+          <li>Gist backup files: retained in your own GitHub account, under your control.</li>
+          <li>After uninstalling, local and extension data are cleared by the browser. Backup files in your Gist must be deleted by you on GitHub.</li>
+        </ul>
+
+        <h2>7. Your Rights</h2>
+        <ul>
+          <li><strong>Access and export</strong>: export all reading data as a JSON file using the built-in backup feature at any time.</li>
+          <li><strong>Correction</strong>: change reading settings and progress directly in the extension.</li>
+          <li><strong>Deletion</strong>: use the in-app data reset, clear extension data, or uninstall the extension.</li>
+          <li><strong>Response time</strong>: questions or deletion requests made through the contact below are typically answered within 7 business days.</li>
+        </ul>
+
+        <h2>8. Policy Updates</h2>
         <p>
           This page will be updated when data handling changes, with a new effective date.
         </p>
 
-        <h2>7. Contact</h2>
-        <p>
-          For questions, open an issue at:
-          <a href="https://github.com/xyfy/Xyfy.TxtReader/issues">https://github.com/xyfy/Xyfy.TxtReader/issues</a>
-        </p>
+        <h2>9. Contact</h2>
+        <ul>
+          <li>Developer: maintainer of Xyfy TXT Reader (GitHub account <a href="https://github.com/xyfy">xyfy</a>)</li>
+          <li>Issues: <a href="https://github.com/xyfy/Xyfy.TxtReader/issues">https://github.com/xyfy/Xyfy.TxtReader/issues</a></li>
+          <li>Privacy requests: please tag the issue with "privacy" so it is prioritised.</li>
+        </ul>
       </article>
     </main>
   </body>
