@@ -22,6 +22,14 @@ import {
   saveProgress,
   saveReaderSettings
 } from "../modules/storage.js";
+import {
+  DEFAULT_KEYBINDINGS,
+  READER_ACTIONS,
+  detectKeybindingConflict,
+  eventToBinding,
+  formatBinding,
+  matchKeyBinding
+} from "../modules/keyboard-map.js";
 
 const state = {
   settings: getDefaultSettings(),
@@ -123,7 +131,16 @@ const elements = {
   debugPanel: document.getElementById("debug-panel"),
   readerHeader: document.querySelector(".reader-header"),
   readerFooter: document.querySelector(".reader-footer"),
-  readerShell: document.querySelector(".reader-shell")
+  readerShell: document.querySelector(".reader-shell"),
+  useCustomFont: document.getElementById("use-custom-font"),
+  customFont: document.getElementById("custom-font"),
+  fontPreview: document.getElementById("font-preview"),
+  themeColorGrid: document.getElementById("theme-color-grid"),
+  contrastWarning: document.getElementById("contrast-warning"),
+  resetColors: document.getElementById("reset-colors"),
+  resetKeys: document.getElementById("reset-keys"),
+  shortcutList: document.getElementById("shortcut-list"),
+  shortcutHelpList: document.getElementById("shortcut-help-list")
 };
 
 let resizeTimer = null;
@@ -581,6 +598,10 @@ function refreshI18nUi() {
 
   updateTokenVisibility();
   updateNavButtonLabels();
+
+  // 动态生成的动作名/键位文案随语言切换刷新
+  if (shortcutsOpen) renderShortcutHelp();
+  if (settingsOpen) renderShortcutList();
 }
 
 const GIST_CONFIG_KEY = "gistCloudConfig";
@@ -1024,11 +1045,17 @@ function renderStats() {
 
 function setShortcutsOverlay(open) {
   shortcutsOpen = open;
+  if (open) {
+    renderShortcutHelp();
+  }
   elements.shortcutsOverlay.classList.toggle("hidden", !open);
 }
 
 function setSettingsOverlay(open) {
   settingsOpen = open;
+  if (open) {
+    renderShortcutList();
+  }
   elements.settingsOverlay?.classList.toggle("hidden", !open);
 }
 
@@ -1113,14 +1140,190 @@ function renderBookmarks() {
   }
 }
 
+// 仅 6 个不透明实色可由用户调整；边框/纸影由正文色按低透明度派生
+const COLOR_KEYS = ["bgColor", "surfaceColor", "textColor", "mutedColor", "accentColor", "accentStrong"];
+const COLOR_VAR_MAP = {
+  bgColor: "--bg-color",
+  surfaceColor: "--surface-color",
+  textColor: "--text-color",
+  mutedColor: "--muted-color",
+  accentColor: "--accent-color",
+  accentStrong: "--accent-strong"
+};
+const DERIVED_VAR_ALPHA = {
+  "--border-color": 0.22,
+  "--surface-shadow": 0.18
+};
+// 仅允许字体族常见字符，拒绝 < > ; @ 与 url() 等可能注入/破坏布局的内容。
+const FONT_FAMILY_SAFE = /^[A-Za-z0-9 ,."'_()-]+$/;
+
+function isFontFamilyValueSafe(value) {
+  if (typeof value !== "string" || value.trim() === "") return false;
+  if (/[<>;@]/.test(value) || /url\(/i.test(value)) return false;
+  return FONT_FAMILY_SAFE.test(value.trim());
+}
+
+function getEffectiveFont(settings) {
+  const custom = settings.customFont;
+  if (custom && isFontFamilyValueSafe(custom)) {
+    return custom;
+  }
+  return settings.fontFamily;
+}
+
+function toColorInputValue(hex) {
+  return typeof hex === "string" && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : "#000000";
+}
+
+function rgbStringToHex(value) {
+  const m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(value || "");
+  if (!m) return "";
+  return `#${[1, 2, 3].map((i) => Number(m[i]).toString(16).padStart(2, "0")).join("")}`;
+}
+
+// 读取当前生效的调色板（用于切入自定义主题时以现有观感为起点）
+function captureCurrentPalette() {
+  const probe = document.createElement("span");
+  probe.style.display = "none";
+  document.body.append(probe);
+  const palette = {};
+  for (const key of COLOR_KEYS) {
+    probe.style.color = `var(${COLOR_VAR_MAP[key]})`;
+    palette[key] = rgbStringToHex(getComputedStyle(probe).color);
+  }
+  probe.remove();
+  return palette;
+}
+
+function parseHex(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return null;
+  const int = parseInt(m[1], 16);
+  return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 };
+}
+
+function relativeLuminance({ r, g, b }) {
+  const channel = (c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function contrastRatio(hexA, hexB) {
+  const a = parseHex(hexA);
+  const b = parseHex(hexB);
+  if (!a || !b) return null;
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  const lighter = Math.max(la, lb);
+  const darker = Math.min(la, lb);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function applyFontSettings() {
+  const effective = getEffectiveFont(state.settings);
+  document.documentElement.style.setProperty("--font-family", effective);
+  if (elements.fontSelect) elements.fontSelect.value = state.settings.fontFamily;
+  if (elements.customFont) {
+    const value = state.settings.customFont || "";
+    // 仅在值不同时回写，避免输入过程中光标跳到末尾
+    if (elements.customFont.value !== value) elements.customFont.value = value;
+    elements.customFont.classList.toggle("invalid", Boolean(value) && !isFontFamilyValueSafe(value));
+  }
+  if (elements.useCustomFont) elements.useCustomFont.checked = Boolean(state.settings.customFont);
+  if (elements.fontPreview) elements.fontPreview.style.fontFamily = effective;
+}
+
+function hexToRgba(hex, alpha) {
+  const rgb = parseHex(hex);
+  if (!rgb) return "";
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+}
+
+// 按比例把颜色推向黑/白，用于由主色派生出外壳渐变的第二色
+function shiftHex(hex, amount) {
+  const rgb = parseHex(hex);
+  if (!rgb) return "";
+  const target = amount < 0 ? 0 : 255;
+  const mix = Math.abs(amount);
+  const channel = (c) => Math.round(c + (target - c) * mix);
+  return `#${[rgb.r, rgb.g, rgb.b].map((c) => channel(c).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function applyTheme() {
+  const { theme, themeColors } = state.settings;
+  const root = document.documentElement;
+  if (theme === "custom") {
+    // 清除预设主题属性，避免 body[data-theme] 的 CSS 覆盖自定义内联变量
+    document.body.removeAttribute("data-theme");
+    for (const key of COLOR_KEYS) {
+      const value = themeColors?.[key];
+      if (value) {
+        root.style.setProperty(COLOR_VAR_MAP[key], value);
+      } else {
+        root.style.removeProperty(COLOR_VAR_MAP[key]);
+      }
+    }
+    // 边框与纸影不可用取色器表达（带透明度），统一由正文色派生，保证与自定义底色和谐
+    for (const [varName, alpha] of Object.entries(DERIVED_VAR_ALPHA)) {
+      const derived = themeColors?.textColor ? hexToRgba(themeColors.textColor, alpha) : "";
+      if (derived) {
+        root.style.setProperty(varName, derived);
+      } else {
+        root.style.removeProperty(varName);
+      }
+    }
+    // 外层背景渐变也随之推导，否则深色自定义主题下侧栏/页头仍残留浅色米调
+    const bg = themeColors?.bgColor;
+    if (bg) {
+      const light = (relativeLuminance(parseHex(bg)) || 0) > 0.5;
+      root.style.setProperty("--bg-gradient-start", shiftHex(bg, light ? -0.08 : -0.05));
+      root.style.setProperty("--bg-glow", `rgba(255, 255, 255, ${light ? 0.4 : 0.05})`);
+      root.style.setProperty("--control-bg", `rgba(255, 255, 255, ${light ? 0.35 : 0.1})`);
+      root.style.setProperty(
+        "--panel-wash",
+        themeColors?.surfaceColor ? hexToRgba(themeColors.surfaceColor, light ? 0.4 : 0.55) : ""
+      );
+      if (!themeColors?.surfaceColor) root.style.removeProperty("--panel-wash");
+    } else {
+      root.style.removeProperty("--bg-gradient-start");
+      root.style.removeProperty("--bg-glow");
+      root.style.removeProperty("--control-bg");
+      root.style.removeProperty("--panel-wash");
+    }
+  } else {
+    for (const key of COLOR_KEYS) {
+      root.style.removeProperty(COLOR_VAR_MAP[key]);
+    }
+    for (const varName of Object.keys(DERIVED_VAR_ALPHA)) {
+      root.style.removeProperty(varName);
+    }
+    root.style.removeProperty("--bg-gradient-start");
+    root.style.removeProperty("--bg-glow");
+    root.style.removeProperty("--control-bg");
+    root.style.removeProperty("--panel-wash");
+    document.body.dataset.theme = theme || "paper";
+  }
+
+  const isCustom = theme === "custom";
+  if (elements.themeColorGrid) {
+    elements.themeColorGrid.querySelectorAll(".color-input").forEach((input) => {
+      const key = input.dataset.colorKey;
+      input.value = toColorInputValue(state.settings.themeColors?.[key]);
+      input.disabled = !isCustom;
+    });
+  }
+  if (elements.contrastWarning) elements.contrastWarning.classList.add("hidden");
+}
+
 function applySettings() {
-  document.body.dataset.theme = state.settings.theme;
-  document.documentElement.style.setProperty("--font-family", state.settings.fontFamily);
+  applyTheme();
+  applyFontSettings();
   document.documentElement.style.setProperty("--font-size", `${state.settings.fontSize}px`);
   document.documentElement.style.setProperty("--line-height", String(state.settings.lineHeight));
   elements.readingMode.value = state.settings.readingMode || "book";
   elements.themeSelect.value = state.settings.theme;
-  elements.fontSelect.value = state.settings.fontFamily;
   elements.fontSize.value = String(state.settings.fontSize);
   elements.animationStyle.value = state.settings.animationStyle || "slide";
   elements.animationIntensity.value = String(state.settings.animationIntensity || 2);
@@ -1659,10 +1862,17 @@ async function addBookmark() {
 }
 
 async function handleSettingsChange() {
+  const nextTheme = elements.themeSelect.value;
+  let themeColors = state.settings.themeColors;
+  // 首次切入自定义主题时，先按当前观感填好各色值，而不是留空让用户从零调
+  if (nextTheme === "custom" && !Object.values(themeColors || {}).some(Boolean)) {
+    themeColors = captureCurrentPalette();
+  }
   state.settings = {
     ...state.settings,
     readingMode: elements.readingMode.value,
-    theme: elements.themeSelect.value,
+    theme: nextTheme,
+    themeColors,
     fontFamily: elements.fontSelect.value,
     fontSize: Number(elements.fontSize.value),
     lineHeight: state.settings.lineHeight,
@@ -1671,6 +1881,9 @@ async function handleSettingsChange() {
     showStats: Boolean(elements.showStats?.checked)
   };
   applySettings();
+  if (nextTheme === "custom") {
+    updateContrastWarning(state.settings.themeColors);
+  }
   detectPagesPerView();
   await saveReaderSettings(state.settings);
   rebuildPages();
@@ -1696,6 +1909,228 @@ function toggleDebugPanel() {
   elements.debugToggle.setAttribute("aria-pressed", String(state.debugEnabled));
   if (state.debugEnabled) {
     renderDebugPanel();
+  }
+}
+
+const EMPTY_THEME_COLORS = {
+  bgColor: "",
+  surfaceColor: "",
+  textColor: "",
+  mutedColor: "",
+  accentColor: "",
+  accentStrong: ""
+};
+
+const ACTION_LABEL_KEY = {
+  nextChapter: "actNextChapter",
+  prevChapter: "actPrevChapter",
+  nextPage: "actNextPage",
+  prevPage: "actPrevPage",
+  scrollLineDown: "actScrollLineDown",
+  scrollLineUp: "actScrollLineUp",
+  bookmark: "actBookmark",
+  togglePanel: "actTogglePanel",
+  toggleDebug: "actToggleDebug",
+  openShortcuts: "actOpenShortcuts",
+  closeShortcuts: "actCloseShortcuts"
+};
+
+function primaryBinding(keybindings, action) {
+  const list = keybindings ? keybindings[action] : null;
+  return Array.isArray(list) ? list[0] : list || null;
+}
+
+function renderShortcutHelp() {
+  if (!elements.shortcutHelpList) return;
+  elements.shortcutHelpList.innerHTML = "";
+  for (const action of READER_ACTIONS) {
+    const binding = primaryBinding(state.settings.keybindings, action);
+    if (!binding) continue;
+    const row = document.createElement("div");
+    const key = document.createElement("strong");
+    key.textContent = formatBinding(binding);
+    const desc = document.createElement("span");
+    desc.textContent = t(ACTION_LABEL_KEY[action] || action);
+    row.append(key, desc);
+    elements.shortcutHelpList.append(row);
+  }
+}
+
+function renderShortcutList() {
+  if (!elements.shortcutList) return;
+  elements.shortcutList.innerHTML = "";
+  for (const action of READER_ACTIONS) {
+    if (action === "closeShortcuts") continue; // Escape 关闭浮层不可重绑
+    const binding = primaryBinding(state.settings.keybindings, action);
+    const row = document.createElement("div");
+    row.className = "shortcut-row";
+    const label = document.createElement("span");
+    label.className = "shortcut-label";
+    label.textContent = t(ACTION_LABEL_KEY[action] || action);
+    const keyBtn = document.createElement("button");
+    keyBtn.type = "button";
+    keyBtn.className = "shortcut-key";
+    keyBtn.textContent = binding ? formatBinding(binding) : "—";
+    keyBtn.addEventListener("click", () => startRebindCapture(action, keyBtn));
+    row.append(label, keyBtn);
+    elements.shortcutList.append(row);
+  }
+}
+
+let rebindState = null;
+function startRebindCapture(action, buttonEl) {
+  if (rebindState) {
+    rebindState.cleanup();
+  }
+  buttonEl.textContent = "…";
+  buttonEl.classList.add("capturing");
+
+  const cleanup = () => {
+    document.removeEventListener("keydown", handler, true);
+    buttonEl.classList.remove("capturing");
+    rebindState = null;
+    const b = primaryBinding(state.settings.keybindings, action);
+    buttonEl.textContent = b ? formatBinding(b) : "—";
+  };
+
+  const handler = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === "Escape") {
+      cleanup();
+      return;
+    }
+    const binding = eventToBinding(event);
+    const conflict = detectKeybindingConflict(action, binding, state.settings.keybindings);
+    if (conflict) {
+      buttonEl.textContent = t("warnKeyConflict", { action: t(ACTION_LABEL_KEY[conflict] || conflict) });
+      cleanup();
+      return;
+    }
+    state.settings = {
+      ...state.settings,
+      keybindings: { ...state.settings.keybindings, [action]: [binding] }
+    };
+    cleanup();
+    renderShortcutList();
+    saveReaderSettings(state.settings).catch(() => {});
+  };
+
+  rebindState = { cleanup };
+  document.addEventListener("keydown", handler, true);
+}
+
+function resetKeybindings() {
+  state.settings = {
+    ...state.settings,
+    keybindings: JSON.parse(JSON.stringify(DEFAULT_KEYBINDINGS))
+  };
+  renderShortcutList();
+  saveReaderSettings(state.settings).catch(() => {});
+}
+
+function resetColors() {
+  state.settings = {
+    ...state.settings,
+    theme: "paper",
+    themeColors: { ...EMPTY_THEME_COLORS }
+  };
+  applySettings();
+  saveReaderSettings(state.settings).catch(() => {});
+}
+
+function updateContrastWarning(colors) {
+  if (!elements.contrastWarning) return;
+  // 正文同时显示在页面底色与纸面（面板/卡片）上，两者都需达标
+  const ratios = [
+    contrastRatio(colors.textColor, colors.bgColor),
+    contrastRatio(colors.textColor, colors.surfaceColor)
+  ].filter((r) => r !== null);
+  const tooLow = ratios.some((r) => r < 4.5);
+  elements.contrastWarning.classList.toggle("hidden", !tooLow);
+}
+
+function handleColorInputChange(event) {
+  const input = event.target;
+  const key = input.dataset.colorKey;
+  if (!key) return;
+  const nextColors = { ...state.settings.themeColors, [key]: input.value };
+  const nextSettings = { ...state.settings, themeColors: nextColors };
+  if (nextSettings.theme !== "custom") {
+    nextSettings.theme = "custom";
+    if (elements.themeSelect) elements.themeSelect.value = "custom";
+  }
+  state.settings = nextSettings;
+  applyTheme();
+  updateContrastWarning(nextColors);
+  saveReaderSettings(state.settings).catch(() => {});
+}
+
+function applyCustomFontChange() {
+  const useCustom = Boolean(elements.useCustomFont?.checked);
+  let value = (elements.customFont?.value || "").trim();
+  if (useCustom && !value) {
+    // 勾选但尚未填写时保持勾选并把焦点交给输入框，避免"勾了没反应"
+    state.settings = { ...state.settings, customFont: "" };
+    applyFontSettings();
+    elements.useCustomFont.checked = true;
+    elements.customFont?.focus();
+    return;
+  }
+  if (!useCustom) {
+    value = "";
+  }
+  state.settings = { ...state.settings, customFont: value };
+  applyFontSettings();
+  saveReaderSettings(state.settings).catch(() => {});
+}
+
+function dispatchReaderAction(action) {
+  switch (action) {
+    case "nextChapter":
+      if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
+        goToChapter(state.currentChapterIndex + 1);
+      }
+      break;
+    case "prevChapter":
+      if (state.currentChapterIndex > 0) {
+        goToChapter(state.currentChapterIndex - 1);
+      }
+      break;
+    case "nextPage":
+      if (isScrollMode()) {
+        handleScrollModeSpace(1);
+      } else {
+        nextPage();
+      }
+      break;
+    case "prevPage":
+      if (isScrollMode()) {
+        handleScrollModeSpace(-1);
+      } else {
+        prevPage();
+      }
+      break;
+    case "scrollLineDown":
+      scrollByLine(1);
+      break;
+    case "scrollLineUp":
+      scrollByLine(-1);
+      break;
+    case "bookmark":
+      addBookmark();
+      break;
+    case "togglePanel":
+      toggleSidePanel();
+      break;
+    case "toggleDebug":
+      toggleDebugPanel();
+      break;
+    case "openShortcuts":
+      setShortcutsOverlay(true);
+      break;
+    default:
+      break;
   }
 }
 
@@ -1807,94 +2242,39 @@ function bindEvents() {
     }, 120);
   });
 
+  elements.customFont?.addEventListener("input", applyCustomFontChange);
+  elements.useCustomFont?.addEventListener("change", applyCustomFontChange);
+  elements.resetColors?.addEventListener("click", resetColors);
+  elements.resetKeys?.addEventListener("click", resetKeybindings);
+  elements.themeColorGrid?.querySelectorAll(".color-input").forEach((input) => {
+    input.addEventListener("input", handleColorInputChange);
+  });
+
   document.addEventListener("keydown", (event) => {
     const target = event.target;
     if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
       return;
     }
 
-    if (event.key === "Escape" && shortcutsOpen) {
-      event.preventDefault();
-      setShortcutsOverlay(false);
+    // Escape 关闭浮层为不可重绑的保护性固定行为
+    if (event.key === "Escape") {
+      if (shortcutsOpen) {
+        event.preventDefault();
+        setShortcutsOverlay(false);
+        return;
+      }
+      if (settingsOpen) {
+        event.preventDefault();
+        setSettingsOverlay(false);
+        return;
+      }
       return;
     }
 
-    if (event.key === "Escape" && settingsOpen) {
+    const action = matchKeyBinding(event, state.settings.keybindings);
+    if (action) {
       event.preventDefault();
-      setSettingsOverlay(false);
-      return;
-    }
-
-    if (event.key === "?" || event.key.toLowerCase() === "h") {
-      event.preventDefault();
-      setShortcutsOverlay(true);
-      return;
-    }
-
-    if (event.key === "Tab") {
-      event.preventDefault();
-      toggleSidePanel();
-    }
-
-    if (event.altKey && event.key.toLowerCase() === "d") {
-      event.preventDefault();
-      toggleDebugPanel();
-    }
-
-    if (event.key === "ArrowRight") {
-      event.preventDefault();
-      if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
-        goToChapter(state.currentChapterIndex + 1);
-      }
-    }
-
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      if (state.currentChapterIndex > 0) {
-        goToChapter(state.currentChapterIndex - 1);
-      }
-    }
-
-    if (isScrollMode() && event.key === "ArrowDown") {
-      event.preventDefault();
-      scrollByLine(1);
-    }
-
-    if (isScrollMode() && event.key === "ArrowUp") {
-      event.preventDefault();
-      scrollByLine(-1);
-    }
-
-    if (event.key === " ") {
-      event.preventDefault();
-      if (isScrollMode()) {
-        handleScrollModeSpace(event.shiftKey ? -1 : 1);
-      } else {
-        if (event.shiftKey) {
-          prevPage();
-        } else {
-          nextPage();
-        }
-      }
-    }
-
-    if (event.key === "[") {
-      event.preventDefault();
-      if (state.currentChapterIndex > 0) {
-        goToChapter(state.currentChapterIndex - 1);
-      }
-    }
-
-    if (event.key === "]") {
-      event.preventDefault();
-      if (state.book && state.currentChapterIndex + 1 < state.book.chapters.length) {
-        goToChapter(state.currentChapterIndex + 1);
-      }
-    }
-
-    if (event.key.toLowerCase() === "b") {
-      event.preventDefault();
-      addBookmark();
+      dispatchReaderAction(action);
     }
   });
 

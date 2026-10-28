@@ -7,6 +7,10 @@
   --accent-color: #6e4e2c;
   --accent-strong: #4e351c;
   --border-color: rgba(110, 78, 44, 0.22);
+  --bg-gradient-start: #d7c7aa;
+  --bg-glow: rgba(255, 255, 255, 0.55);
+  --panel-wash: rgba(255, 250, 243, 0.35);
+  --control-bg: rgba(255, 255, 255, 0.35);
   --font-family: "Noto Serif SC", Georgia, serif;
   --font-size: 18px;
   --line-height: 1.8;
@@ -20,9 +24,10 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
+  /* 外层底色由变量驱动，自定义主题/夜间主题下才不会残留浅色米调 */
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.55), transparent 30%),
-    linear-gradient(135deg, #d7c7aa, var(--bg-color));
+    radial-gradient(circle at top left, var(--bg-glow), transparent 30%),
+    linear-gradient(135deg, var(--bg-gradient-start), var(--bg-color));
   color: var(--text-color);
   font-family: var(--font-family);
 }
@@ -43,6 +48,10 @@ body[data-theme="night"] {
   --accent-color: #d1a15d;
   --accent-strong: #f5c47a;
   --border-color: rgba(245, 196, 122, 0.16);
+  --bg-gradient-start: #10141b;
+  --bg-glow: rgba(255, 255, 255, 0.06);
+  --panel-wash: rgba(35, 43, 55, 0.55);
+  --control-bg: rgba(255, 255, 255, 0.1);
 }
 
 button,
@@ -56,7 +65,7 @@ button,
   border: 1px solid var(--border-color);
   border-radius: 999px;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--control-bg);
   color: var(--text-color);
   cursor: pointer;
 }
@@ -149,7 +158,7 @@ body.is-immersive .app-shell {
   padding: 24px 18px;
   border-right: 1px solid var(--border-color);
   backdrop-filter: blur(12px);
-  background: rgba(255, 250, 243, 0.35);
+  background: var(--panel-wash);
   height: 100%;
   box-sizing: border-box;
   overflow-y: auto;
@@ -302,7 +311,8 @@ select {
   padding: 10px 14px;
   border: 1px solid var(--border-color);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--control-bg);
+  color: var(--text-color);
 }
 
 .reader-shell {
@@ -587,6 +597,109 @@ body.is-immersive .paper-page {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--border-color);
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin-top: 12px;
+}
+
+.color-grid label {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted-color);
+}
+
+.color-grid input[type="color"] {
+  width: 100%;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.color-grid input[type="color"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.color-warning {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: rgba(255, 196, 122, 0.18);
+  color: var(--text-color);
+  font-size: 13px;
+}
+
+.font-custom-field {
+  margin-top: 8px;
+}
+
+.font-custom-field input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-color);
+  font-family: var(--font-family);
+}
+
+.font-custom-field input::placeholder {
+  color: var(--muted-color);
+  opacity: 0.8;
+}
+
+.font-custom-field input.invalid {
+  border-color: #d9534f;
+}
+
+.font-preview {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
+  color: var(--text-color);
+  font-family: var(--font-family);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.shortcut-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.shortcut-label {
+  color: var(--text-color);
+  font-size: 14px;
+}
+
+.shortcut-key {
+  min-width: 96px;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.shortcut-key.capturing {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  color: #fffaf0;
 }
 
 .settings-card .file-picker span {

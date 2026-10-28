@@ -1,3 +1,134 @@
+// 阅读器快捷键映射模块
+//
+// 设计要点：
+// - DEFAULT_KEYBINDINGS 是「动作 → 绑定」的单一事实来源，用户可在设置中覆盖。
+// - 绑定对象：{ key, altKey?, ctrlKey?, metaKey?, shiftKey? }，key 为 KeyboardEvent.key 原值（空格为 " "）。
+// - 每个动作可对应一个或多个绑定（数组）。
+// - closeShortcuts（Escape）刻意保留在 DEFAULT_KEYBINDINGS 中用于帮助文案展示，
+//   但在 reader.js 中 Escape 关闭浮层为不可重绑行为，不参与重绑匹配。
+
+export const READER_ACTIONS = [
+  "nextChapter",
+  "prevChapter",
+  "nextPage",
+  "prevPage",
+  "scrollLineDown",
+  "scrollLineUp",
+  "bookmark",
+  "togglePanel",
+  "toggleDebug",
+  "openShortcuts",
+  "closeShortcuts"
+];
+
+export const DEFAULT_KEYBINDINGS = {
+  nextChapter: [{ key: "ArrowRight" }, { key: "[" }],
+  prevChapter: [{ key: "ArrowLeft" }, { key: "]" }],
+  nextPage: [{ key: " ", shiftKey: false }],
+  prevPage: [{ key: " ", shiftKey: true }],
+  scrollLineDown: [{ key: "ArrowDown" }],
+  scrollLineUp: [{ key: "ArrowUp" }],
+  bookmark: [{ key: "b" }],
+  togglePanel: [{ key: "Tab" }],
+  toggleDebug: [{ key: "d", altKey: true }],
+  openShortcuts: [{ key: "?" }, { key: "h" }],
+  closeShortcuts: [{ key: "Escape" }]
+};
+
+// 不可被用户重绑的动作（Escape 关闭浮层为保护性固定行为）。
+export const PROTECTED_ACTIONS = ["closeShortcuts"];
+
+function normalizeBinding(binding = {}) {
+  const key = typeof binding.key === "string" ? binding.key : "";
+  return {
+    key,
+    altKey: Boolean(binding.altKey),
+    ctrlKey: Boolean(binding.ctrlKey),
+    metaKey: Boolean(binding.metaKey),
+    shiftKey: binding.shiftKey === undefined ? false : Boolean(binding.shiftKey)
+  };
+}
+
+function sameBinding(left, right) {
+  const a = normalizeBinding(left);
+  const b = normalizeBinding(right);
+  return (
+    a.key.toLowerCase() === b.key.toLowerCase() &&
+    a.altKey === b.altKey &&
+    a.ctrlKey === b.ctrlKey &&
+    a.metaKey === b.metaKey &&
+    a.shiftKey === b.shiftKey
+  );
+}
+
+function toBindingList(bindings) {
+  if (!bindings) return [];
+  return Array.isArray(bindings) ? bindings : [bindings];
+}
+
+// 将键盘事件匹配到动作；无匹配返回 null。
+export function matchKeyBinding(event, keybindings = DEFAULT_KEYBINDINGS) {
+  if (!event || typeof event.key !== "string" || event.key === "") {
+    return null;
+  }
+
+  for (const action of READER_ACTIONS) {
+    if (PROTECTED_ACTIONS.includes(action)) {
+      continue;
+    }
+    const list = toBindingList(keybindings[action]);
+    if (list.some((binding) => sameBinding(event, binding))) {
+      return action;
+    }
+  }
+
+  return null;
+}
+
+// 检测 `binding` 是否已被 `action` 之外的其他动作占用。返回冲突的动作名或 null。
+export function detectKeybindingConflict(action, binding, keybindings = DEFAULT_KEYBINDINGS) {
+  if (PROTECTED_ACTIONS.includes(action)) {
+    return null;
+  }
+  const target = normalizeBinding(binding);
+  for (const other of READER_ACTIONS) {
+    if (other === action || PROTECTED_ACTIONS.includes(other)) {
+      continue;
+    }
+    const list = toBindingList(keybindings[other]);
+    if (list.some((candidate) => sameBinding(candidate, target))) {
+      return other;
+    }
+  }
+  return null;
+}
+
+// 将绑定格式化为人类可读文案，例如 "Ctrl+Alt+D"、"Space"、"ArrowRight"。
+export function formatBinding(binding) {
+  const b = normalizeBinding(binding);
+  const parts = [];
+  if (b.ctrlKey) parts.push("Ctrl");
+  if (b.altKey) parts.push("Alt");
+  if (b.metaKey) parts.push("Meta");
+  if (b.shiftKey) parts.push("Shift");
+  let key = b.key;
+  if (key === " ") key = "Space";
+  parts.push(key.length === 1 ? key.toUpperCase() : key);
+  return parts.join("+");
+}
+
+// 将字符串渲染为单个绑定对象（用于把捕获到的按键序列转成可存储结构）。
+export function eventToBinding(event) {
+  return normalizeBinding({
+    key: event.key,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    shiftKey: event.shiftKey
+  });
+}
+
+// 保留的兼容接口：基于事件参数解析动作（老逻辑，供测试/回退使用）。
 export function resolveReaderKeyAction({
   key,
   altKey = false,

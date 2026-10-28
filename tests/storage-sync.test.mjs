@@ -6,6 +6,21 @@ function run() {
   assert.equal(normalized.theme, "night");
   assert.equal(normalized.settingsUpdatedAt, 123);
   assert.equal(normalized.readingMode, "book");
+  // 新增字段：旧设置缺失时自动补齐默认（无需迁移脚本）
+  assert.equal(normalized.customFont, "");
+  assert.equal(normalized.themeColors.bgColor, "");
+  assert.equal(normalized.themeColors.textColor, "");
+  assert.ok(Array.isArray(normalized.keybindings.nextChapter));
+
+  // 嵌套字段深合并：仅覆盖传入部分，缺失项回退默认
+  const partial = normalizeStoredSettings({
+    themeColors: { bgColor: "#ffffff" },
+    keybindings: { nextChapter: [{ key: "a" }] }
+  });
+  assert.equal(partial.themeColors.bgColor, "#ffffff");
+  assert.equal(partial.themeColors.textColor, "");
+  assert.deepEqual(partial.keybindings.nextChapter, [{ key: "a" }]);
+  assert.ok(partial.keybindings.bookmark, "保留默认键位");
 
   const localSettings = { theme: "paper", settingsUpdatedAt: 100 };
   const syncSettings = { theme: "night", settingsUpdatedAt: 200 };

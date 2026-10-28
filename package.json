@@ -1,11 +1,12 @@
 {
   "name": "xyfy-txt-reader",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build:zip": "rm -f dist/xyfy-txt-reader-v$npm_package_version.zip && mkdir -p dist && zip -r dist/xyfy-txt-reader-v$npm_package_version.zip . -x 'dist/*' '.git/*' '.github/*' 'node_modules/*' 'tests/*' 'docs/*' 'scripts/*' '*.DS_Store'",
     "build:webapp": "node scripts/build-webapp.mjs",
+    "lint": "eslint .",
     "gen:icons": "node scripts/gen-icons.mjs",
     "test": "npm run test:paginator && npm run test:backup && npm run test:storage-sync && npm run test:cloud-provider",
     "test:paginator": "node tests/paginator.test.mjs",
@@ -14,6 +15,9 @@
     "test:cloud-provider": "node tests/cloud-provider.test.mjs"
   },
   "devDependencies": {
-    "sharp": "^0.34.5"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "sharp": "^0.35.5"
   }
 }
