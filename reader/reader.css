@@ -589,6 +589,92 @@ body.is-immersive .paper-page {
   border-top: 1px solid var(--border-color);
 }
 
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin-top: 12px;
+}
+
+.color-grid label {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted-color);
+}
+
+.color-grid input[type="color"] {
+  width: 100%;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.color-grid input[type="color"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.color-warning {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: rgba(255, 196, 122, 0.18);
+  color: var(--text-color);
+  font-size: 13px;
+}
+
+.font-custom-field {
+  margin-top: 8px;
+}
+
+.font-custom-field input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.45);
+  font-family: var(--font-family);
+}
+
+.font-custom-field input.invalid {
+  border-color: #d9534f;
+}
+
+.shortcut-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.shortcut-label {
+  color: var(--text-color);
+  font-size: 14px;
+}
+
+.shortcut-key {
+  min-width: 96px;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.shortcut-key.capturing {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  color: #fffaf0;
+}
+
 .settings-card .file-picker span {
   width: auto;
 }
