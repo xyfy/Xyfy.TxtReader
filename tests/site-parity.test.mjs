@@ -60,6 +60,12 @@ function run() {
     assert.ok(webIds.includes(id), `web/index.html 缺少关键控件 #${id}`);
   }
 
+  // Pages 的源是仓库根目录：没有 index.html 时 GitHub 会退化成渲染 README，
+  // 表现就是「网站首页看起来是旧的/不是阅读器」。根入口必须转发到真正的站点版。
+  const rootIndex = read("index.html");
+  assert.ok(/url=web\//.test(rootIndex), "index.html 应带 meta 刷新转发到 web/");
+  assert.ok(/location\.replace\("web\//.test(rootIndex), "index.html 应有 JS 转发兜底");
+
   console.log(`site parity tests passed (${readerIds.length} ids)`);
 }
 
