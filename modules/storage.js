@@ -1,17 +1,35 @@
+import { DEFAULT_KEYBINDINGS } from "./keyboard-map.js";
+
 const SETTINGS_KEY = "reader-settings";
 const SETTINGS_SYNC_KEY = "reader-settings-sync";
 const PROGRESS_SYNC_KEY = "reader-progress-sync";
 const SETTINGS_UPDATED_AT_KEY = "settingsUpdatedAt";
 const DEFAULT_SETTINGS = {
   theme: "paper",
+  customFont: "",
+  // 仅收 6 个不透明实色；边框/纸影由正文色派生，避免取色器丢透明度
+  themeColors: {
+    bgColor: "",
+    surfaceColor: "",
+    textColor: "",
+    mutedColor: "",
+    accentColor: "",
+    accentStrong: ""
+  },
   fontFamily: '"Noto Serif SC", Georgia, serif',
   fontSize: 18,
   lineHeight: 1.8,
   readingMode: "book",
   animationStyle: "slide",
   animationIntensity: 2,
-  showStats: false
+  showStats: false,
+  keybindings: structuredCloneKeybindings()
 };
+
+// 深拷贝默认键位，避免不同设置实例共享同一份数组引用。
+function structuredCloneKeybindings() {
+  return JSON.parse(JSON.stringify(DEFAULT_KEYBINDINGS));
+}
 const DATABASE_NAME = "xyfy-txt-reader";
 const DATABASE_VERSION = 1;
 
@@ -194,10 +212,20 @@ function syncArea() {
 }
 
 export function normalizeStoredSettings(settings = {}, updatedAt = 0) {
+  const incoming = settings || {};
   return {
     ...DEFAULT_SETTINGS,
-    ...settings,
-    [SETTINGS_UPDATED_AT_KEY]: Number(settings?.[SETTINGS_UPDATED_AT_KEY] || updatedAt || 0)
+    ...incoming,
+    // 嵌套字段做深合并，确保新增动作/颜色在旧设置缺失时也能补齐默认。
+    keybindings: {
+      ...DEFAULT_KEYBINDINGS,
+      ...(incoming.keybindings || {})
+    },
+    themeColors: {
+      ...DEFAULT_SETTINGS.themeColors,
+      ...(incoming.themeColors || {})
+    },
+    [SETTINGS_UPDATED_AT_KEY]: Number(incoming[SETTINGS_UPDATED_AT_KEY] || updatedAt || 0)
   };
 }
 

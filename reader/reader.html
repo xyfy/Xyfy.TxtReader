@@ -115,6 +115,7 @@
                 <option value="paper" data-i18n="readerThemePaper">Paper</option>
                 <option value="sepia" data-i18n="readerThemeSepia">Sepia</option>
                 <option value="night" data-i18n="readerThemeNight">Night</option>
+                <option value="custom" data-i18n="readerThemeCustom">Custom</option>
               </select>
             </label>
             <label>
@@ -151,17 +152,7 @@
               <h2 id="shortcuts-title" data-i18n="readerShortcutsTitle">Keyboard Shortcuts</h2>
               <button id="shortcuts-close" class="small-button" type="button" data-i18n="readerShortcutsClose">Close</button>
             </div>
-            <div class="shortcut-grid">
-              <div><strong>← / →</strong><span data-i18n="readerShortcutsDescArrows">Switch chapters</span></div>
-              <div><strong>Space</strong><span data-i18n="readerShortcutsDescSpace">Next page (or next chapter at page boundary)</span></div>
-              <div><strong>Shift + Space</strong><span data-i18n="readerShortcutsDescShiftSpace">Previous page (or previous chapter at page boundary)</span></div>
-              <div><strong>↑ / ↓</strong><span data-i18n="readerShortcutsDescVertical">Scroll by small steps in scrolling mode</span></div>
-              <div><strong>B</strong><span data-i18n="readerShortcutsDescBookmark">Add a bookmark for the current location</span></div>
-              <div><strong>Tab</strong><span data-i18n="readerShortcutsDescSidebar">Show or hide the sidebar</span></div>
-              <div><strong>H / ?</strong><span data-i18n="readerShortcutsDescHelp">Open keyboard shortcuts help</span></div>
-              <div><strong>Alt + D</strong><span data-i18n="readerShortcutsDescDebug">Toggle the pagination debug panel</span></div>
-              <div><strong>Esc</strong><span data-i18n="readerShortcutsDescEsc">Close the shortcuts overlay</span></div>
-            </div>
+            <div id="shortcut-help-list" class="shortcut-grid"></div>
           </div>
         </div>
         <div id="settings-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -206,6 +197,45 @@
                 </label>
                 <button id="reset-data" type="button" data-i18n="readerResetAction">Reset selected items</button>
               </div>
+            </section>
+            <section class="settings-section">
+              <div class="section-head">
+                <p class="panel-label" data-i18n="sectionCustomFont">自定义字体</p>
+              </div>
+              <label class="settings-switch">
+                <input id="use-custom-font" type="checkbox" />
+                <span data-i18n="chkUseCustomFont">使用自定义字体</span>
+              </label>
+              <label class="font-custom-field">
+                <input id="custom-font" type="text" placeholder='"LXGW WenKai", serif' data-i18n-attr="placeholder:readerFontCustomPlaceholder" />
+              </label>
+              <p id="font-preview" class="font-preview" data-i18n="lblFontPreview">预览：窗含西岭千秋雪</p>
+            </section>
+            <section class="settings-section">
+              <div class="section-head">
+                <p class="panel-label" data-i18n="sectionTemplateColor">Template Color</p>
+              </div>
+              <p class="file-meta" data-i18n="templateColorHint">选择“自定义”主题后即可调整下列颜色（留空则沿用对应预设）。</p>
+              <div id="theme-color-grid" class="color-grid">
+                <label><span data-i18n="lblBgColor">背景</span><input type="color" class="color-input" data-color-key="bgColor" /></label>
+                <label><span data-i18n="lblSurfaceColor">纸面</span><input type="color" class="color-input" data-color-key="surfaceColor" /></label>
+                <label><span data-i18n="lblTextColor">正文</span><input type="color" class="color-input" data-color-key="textColor" /></label>
+                <label><span data-i18n="lblMutedColor">次要</span><input type="color" class="color-input" data-color-key="mutedColor" /></label>
+                <label><span data-i18n="lblAccentColor">强调</span><input type="color" class="color-input" data-color-key="accentColor" /></label>
+                <label><span data-i18n="lblAccentStrong">强强调</span><input type="color" class="color-input" data-color-key="accentStrong" /></label>
+              </div>
+              <p id="contrast-warning" class="color-warning hidden" data-i18n="warnContrastLow">文字与背景对比度偏低，可能影响阅读清晰度。</p>
+              <div class="action-row">
+                <button id="reset-colors" type="button" class="small-button" data-i18n="btnResetColors">重置颜色</button>
+              </div>
+            </section>
+            <section class="settings-section">
+              <div class="section-head">
+                <p class="panel-label" data-i18n="sectionShortcuts">Keyboard Shortcuts</p>
+                <button id="reset-keys" type="button" class="small-button" data-i18n="btnResetKeys">恢复默认</button>
+              </div>
+              <p id="key-rebind-hint" class="file-meta" data-i18n="actRebindingHint">点击「重新绑定」后按下新组合键；按 Esc 取消。Tab / Space / 方向键允许但会提示系统语义。</p>
+              <div id="shortcut-list" class="shortcut-list"></div>
             </section>
             <section id="cloud-section" class="settings-section">
               <div class="section-head">
