@@ -85,14 +85,20 @@ export function matchKeyBinding(event, keybindings = DEFAULT_KEYBINDINGS) {
   return null;
 }
 
-// 检测 `binding` 是否已被 `action` 之外的其他动作占用。返回冲突的动作名或 null。
+/**
+ * 检测 `binding` 是否已被 `action` 之外的其他动作占用。返回冲突的动作名或 null。
+ *
+ * 受保护动作（Escape）本身不可被重绑，但它占用的键同样不能被别人抢走：
+ * reader.js 里 Escape 是硬编码的「关闭浮层」行为，若允许用户把 Escape 绑到别的动作上，
+ * 一次按键会同时触发两个行为。所以这里只跳过「自己」，不跳过受保护动作。
+ */
 export function detectKeybindingConflict(action, binding, keybindings = DEFAULT_KEYBINDINGS) {
   if (PROTECTED_ACTIONS.includes(action)) {
     return null;
   }
   const target = normalizeBinding(binding);
   for (const other of READER_ACTIONS) {
-    if (other === action || PROTECTED_ACTIONS.includes(other)) {
+    if (other === action) {
       continue;
     }
     const list = toBindingList(keybindings[other]);

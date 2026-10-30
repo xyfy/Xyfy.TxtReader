@@ -1,7 +1,21 @@
 import { readTxtFile } from "../modules/file-handler.js";
+import { SUPPORTED_ENCODINGS } from "../modules/encoding.js";
+import { APP_VERSION } from "../modules/app-info.js";
+import { createErrorReporter, detectPlatform } from "../modules/error-report.js";
+import {
+  ERROR_KINDS,
+  READER_STATES,
+  describeImportError,
+  resolveReaderViewState
+} from "../modules/reader-view-state.js";
 import { createBackupFilename, createBackupPayload, parseBackupPayload } from "../modules/backup.js";
-import { parseChapters } from "../modules/chapter-parser.js";
-import { createRenderedChapterPager, paginateChapter } from "../modules/paginator.js";
+import { parseChaptersWithMeta } from "../modules/chapter-parser.js";
+import {
+  clampSpreadStart,
+  collectPages,
+  createRenderedChapterPager,
+  paginateChapter
+} from "../modules/paginator.js";
 import { CloudStorage } from "../modules/cloud-storage.js";
 import { GistProvider } from "../modules/gist-provider.js";
 import { applyI18n, getCurrentLocale, initializeI18n, setLocale, t } from "../modules/i18n.js";
@@ -60,6 +74,13 @@ const state = {
   currentPageIndex: 0,
   cloudProvider: null,
   cloudProviderName: "GitHub Gist",
+  // FR-M1：单次分页被封顶时，记录真正想去的目标页，由空闲预热追赶
+  pendingTargetPage: null,
+  // FR-M4 边界四态
+  isImporting: false,
+  importError: null,
+  needsEncodingChoice: false,
+  lastImportFile: null,
   cloudConfig: {
     gistId: "",
     token: ""
@@ -70,6 +91,9 @@ const state = {
 };
 
 const PAGE_CACHE_LIMIT = 8;
+// FR-M1：单次重建最多生成的页数。恢复阅读进度到大文件深处时不能一口气生成几千页，
+// 先渲染已有的部分保证首屏，剩余部分交给空闲预热逐步补齐。
+const MAX_PAGES_PER_BUILD = 32;
 
 function webLocalStorage() {
   try {
@@ -126,6 +150,7 @@ const elements = {
   animationStyle: document.getElementById("animation-style"),
   animationIntensity: document.getElementById("animation-intensity"),
   showStats: document.getElementById("show-stats"),
+  errorReporting: document.getElementById("error-reporting"),
   languageSelect: document.getElementById("language-select"),
   spreadShell: document.querySelector(".spread-shell"),
   appShell: document.querySelector(".app-shell"),
@@ -157,7 +182,18 @@ const elements = {
   shortcutHelpList: document.getElementById("shortcut-help-list"),
   settingsNav: document.getElementById("settings-nav"),
   cloudSectionToggle: document.getElementById("cloud-section-toggle"),
-  cloudSectionBody: document.getElementById("cloud-section-body")
+  cloudSectionBody: document.getElementById("cloud-section-body"),
+  // FR-M4 边界四态
+  stateOverlay: document.getElementById("reader-state-overlay"),
+  stateLoading: document.getElementById("state-loading"),
+  stateEmpty: document.getElementById("state-empty"),
+  stateEmptyImport: document.getElementById("state-empty-import"),
+  stateError: document.getElementById("state-error"),
+  stateErrorReason: document.getElementById("state-error-reason"),
+  stateErrorEncodingRow: document.getElementById("state-error-encoding-row"),
+  stateErrorEncoding: document.getElementById("state-error-encoding"),
+  stateErrorEncodingApply: document.getElementById("state-error-encoding-apply"),
+  stateErrorRetry: document.getElementById("state-error-retry")
 };
 
 let resizeTimer = null;
@@ -165,6 +201,15 @@ let modeHintTimer = null;
 let warmupTimer = null;
 let shortcutsOpen = false;
 let settingsOpen = false;
+
+// FR-C3：错误上报器。是否上报取决于用户设置（默认关闭）；
+// 未配置上报端点时只写本地日志，不会因为缺端点而抛错。
+const errorReporter = createErrorReporter({
+  version: APP_VERSION,
+  platform: detectPlatform(globalThis.navigator?.userAgent || ""),
+  isEnabled: () => Boolean(state.settings.errorReporting),
+  transport: null
+});
 
 const settingsPanel = createSettingsPanel({
   elements,
@@ -373,6 +418,7 @@ function cancelPaginationWarmup() {
 function clearActivePaginationSession() {
   state.activePaginationSession?.fitChecker?.dispose?.();
   state.activePaginationSession = null;
+  state.pendingTargetPage = null;
 }
 
 function ensurePagesLoaded(requiredCount, maxPagesToGenerate = Number.POSITIVE_INFINITY) {
@@ -381,16 +427,16 @@ function ensurePagesLoaded(requiredCount, maxPagesToGenerate = Number.POSITIVE_I
     return;
   }
 
-  let generated = 0;
-  while (!session.done && session.pages.length < requiredCount && generated < maxPagesToGenerate) {
-    const nextPage = session.pager.next();
-    if (!nextPage) {
-      session.done = true;
-      break;
-    }
-    session.pages.push(nextPage);
-    session.done = session.pager.done;
-    generated += 1;
+  const { pages, done } = collectPages(session.pager, {
+    requiredCount: Math.max(0, requiredCount - session.pages.length),
+    maxPages: maxPagesToGenerate
+  });
+  session.pages.push(...pages);
+  session.done = done || session.pager.done;
+
+  // 分页器异常返回空页时停止，避免调用方空转
+  if (!pages.length && !session.pager.done) {
+    session.done = true;
   }
 
   state.pages = session.pages;
@@ -422,6 +468,15 @@ function schedulePaginationWarmup() {
         break;
       }
       budgetPages += 1;
+    }
+
+    // FR-M1：预热追上被封顶推迟的目标页后，把界面带到真正的阅读位置
+    if (state.pendingTargetPage !== null && activeSession.pages.length > state.pendingTargetPage) {
+      const target = state.pendingTargetPage;
+      state.pendingTargetPage = null;
+      state.currentPageIndex = clampSpreadStart(target, state.pages.length, state.pagesPerView);
+      renderSpread();
+      persistProgress();
     }
 
     if (activeSession.done) {
@@ -1270,6 +1325,9 @@ function applySettings() {
   if (elements.showStats) {
     elements.showStats.checked = Boolean(state.settings.showStats);
   }
+  if (elements.errorReporting) {
+    elements.errorReporting.checked = Boolean(state.settings.errorReporting);
+  }
   elements.statsSection?.classList.toggle("hidden", !state.settings.showStats);
   const disableAnimation = isScrollMode();
   elements.animationStyle.disabled = disableAnimation;
@@ -1359,6 +1417,45 @@ function scrollByLine(direction) {
   scrollContentBy(delta, "auto");
 }
 
+const ERROR_MESSAGE_KEYS = {
+  [ERROR_KINDS.ENCODING]: "readerErrorEncoding",
+  [ERROR_KINDS.EMPTY_FILE]: "readerErrorEmptyFile",
+  [ERROR_KINDS.READ_FAILED]: "readerErrorReadFailed",
+  [ERROR_KINDS.PARSE_FAILED]: "readerErrorParseFailed",
+  [ERROR_KINDS.UNKNOWN]: "readerErrorUnknown"
+};
+
+/**
+ * FR-M4：按当前状态切换「加载中 / 空 / 错误 / 阅读中」四态。
+ * 阅读态下收起整个浮层，其余三态各自显示，错误态额外带出原因与恢复动作。
+ */
+function renderReaderState() {
+  const viewState = resolveReaderViewState({
+    isLoading: state.isImporting,
+    error: state.importError,
+    hasBook: Boolean(state.book),
+    needsEncodingChoice: state.needsEncodingChoice
+  });
+
+  const toggle = (element, visible) => element?.classList.toggle("hidden", !visible);
+
+  toggle(elements.stateOverlay, viewState !== READER_STATES.READING);
+  toggle(elements.stateLoading, viewState === READER_STATES.LOADING);
+  toggle(elements.stateEmpty, viewState === READER_STATES.EMPTY);
+  toggle(elements.stateError, viewState === READER_STATES.ERROR);
+
+  if (viewState === READER_STATES.ERROR) {
+    const { kind, detail } = describeImportError({
+      error: state.importError,
+      needsEncodingChoice: state.needsEncodingChoice
+    });
+    const message = t(ERROR_MESSAGE_KEYS[kind] || "readerErrorUnknown");
+    elements.stateErrorReason.textContent = detail ? `${message}（${detail}）` : message;
+    // FR-M2：只有编码不可识别时才提供手动选编码入口，避免无关状态下误操作
+    toggle(elements.stateErrorEncodingRow, kind === ERROR_KINDS.ENCODING);
+  }
+}
+
 function renderSpread() {
   const chapter = state.book?.chapters?.[state.currentChapterIndex];
   const left = state.pages[state.currentPageIndex] || "";
@@ -1390,6 +1487,7 @@ function renderSpread() {
   renderToc();
   renderStats();
   renderDebugPanel();
+  renderReaderState();
 }
 
 async function persistProgress() {
@@ -1592,13 +1690,13 @@ function rebuildPages() {
     done: pager.done
   };
   const requiredCount = Math.max(state.currentPageIndex + state.pagesPerView, state.pagesPerView * 2);
-  ensurePagesLoaded(requiredCount);
-  if (state.currentPageIndex >= state.pages.length) {
-    state.currentPageIndex = 0;
-  }
-  if (state.currentPageIndex % state.pagesPerView !== 0) {
-    state.currentPageIndex -= state.currentPageIndex % state.pagesPerView;
-  }
+  // FR-M1：单次生成量封顶。恢复进度到大文件深处时不能一口气生成几千页，
+  // 先渲染已生成部分保证首屏，剩下的目标页交给空闲预热追赶。
+  const cappedCount = Math.min(requiredCount, MAX_PAGES_PER_BUILD);
+  state.pendingTargetPage = requiredCount > cappedCount ? state.currentPageIndex : null;
+  ensurePagesLoaded(cappedCount);
+  // 渐近分页下总页数在分页完成前未知，页码必须收敛到已生成范围，否则会渲染空白页
+  state.currentPageIndex = clampSpreadStart(state.currentPageIndex, state.pages.length, state.pagesPerView);
   renderSpread();
   persistProgress();
   schedulePaginationWarmup();
@@ -1644,22 +1742,104 @@ async function loadBook(bookId) {
   await refreshRecentReads();
 }
 
-async function handleFileSelection(event) {
-  const [file] = event.target.files || [];
+/**
+ * 导入文件（FR-M4 的加载态与错误态都收敛在这里）。
+ * 以前这段没有任何 try/catch，损坏文件会直接抛未捕获异常、界面停在旧书上，
+ * 用户既看不到原因也没有重试入口。
+ *
+ * @param {File} file
+ * @param {string|null} encoding 手动指定的编码（FR-M2），为空则自动探测
+ */
+async function importFile(file, encoding = null) {
   if (!file) {
     return;
   }
 
-  const imported = await readTxtFile(file);
-  const chapters = parseChapters(imported.text);
-  const saved = await saveBook({
-    ...imported,
-    chapters
-  });
+  state.lastImportFile = file;
+  state.isImporting = true;
+  state.importError = null;
+  state.needsEncodingChoice = false;
+  renderReaderState();
 
-  state.chapterPageCache.clear();
-  state.books = await listBooks();
-  await loadBook(saved.id);
+  try {
+    const imported = await readTxtFile(file, encoding ? { encoding } : {});
+
+    // FR-M2：自动探测不可靠时进入错误态，由用户手动选编码后重导入
+    if (imported.needsManual) {
+      state.needsEncodingChoice = true;
+      return;
+    }
+
+    if (!imported.text.trim()) {
+      throw Object.assign(new Error("文件内容为空"), { name: "EmptyFileError" });
+    }
+
+    const { chapters, isFallback } = parseChaptersWithMeta(imported.text);
+    const saved = await saveBook({
+      ...imported,
+      chapters
+    });
+
+    state.chapterPageCache.clear();
+    state.books = await listBooks();
+    await loadBook(saved.id);
+
+    // FR-M3：无章节标记的书已按整本平铺，必须明确告诉用户，
+    // 否则用户会以为是目录解析坏了。
+    if (isFallback) {
+      showModeHint(t("readerFlatBookHint"), 3200);
+    }
+  } catch (error) {
+    state.importError = error;
+    console.error("Xyfy.TxtReader 导入失败", error);
+    errorReporter.report(error, { phase: "import" });
+  } finally {
+    state.isImporting = false;
+    renderReaderState();
+  }
+}
+
+function handleFileSelection(event) {
+  const [file] = event.target.files || [];
+  importFile(file);
+}
+
+/** 错误态的「重试」：有上次文件时直接重放，否则重新唤起文件选择 */
+function handleRetryImport() {
+  if (state.lastImportFile) {
+    importFile(state.lastImportFile);
+    return;
+  }
+  elements.fileInput?.click();
+}
+
+/** 空态的导入入口 */
+function handleEmptyStateImport() {
+  elements.fileInput?.click();
+}
+
+/** FR-M2：用手动选择的编码重新导入 */
+function handleEncodingReimport() {
+  const encoding = elements.stateErrorEncoding?.value;
+  if (!encoding || !state.lastImportFile) {
+    return;
+  }
+  importFile(state.lastImportFile, encoding);
+}
+
+/** 填充「手动选择编码」下拉（FR-M2 的手动入口） */
+function fillEncodingOptions() {
+  const select = elements.stateErrorEncoding;
+  if (!select) {
+    return;
+  }
+
+  for (const encoding of SUPPORTED_ENCODINGS) {
+    const option = document.createElement("option");
+    option.value = encoding;
+    option.textContent = encoding;
+    select.append(option);
+  }
 }
 
 async function handleExportBackup() {
@@ -1818,7 +1998,8 @@ async function handleSettingsChange() {
     lineHeight: state.settings.lineHeight,
     animationStyle: elements.animationStyle.value,
     animationIntensity: Number(elements.animationIntensity.value),
-    showStats: Boolean(elements.showStats?.checked)
+    showStats: Boolean(elements.showStats?.checked),
+    errorReporting: Boolean(elements.errorReporting?.checked)
   };
   applySettings();
   if (nextTheme === "custom") {
@@ -1989,6 +2170,11 @@ function dispatchReaderAction(action) {
 function bindEvents() {
   settingsPanel.init();
   elements.fileInput.addEventListener("change", handleFileSelection);
+  // FR-M4：三态对应的恢复动作——空态导入、错误态重试、错误态手动改编码重导入
+  elements.stateEmptyImport?.addEventListener("click", handleEmptyStateImport);
+  elements.stateErrorRetry?.addEventListener("click", handleRetryImport);
+  elements.stateErrorEncodingApply?.addEventListener("click", handleEncodingReimport);
+  fillEncodingOptions();
   elements.exportBackup.addEventListener("click", () => {
     handleExportBackup();
   });
@@ -2075,6 +2261,16 @@ function bindEvents() {
   elements.animationStyle.addEventListener("change", handleSettingsChange);
   elements.animationIntensity.addEventListener("input", handleSettingsChange);
   elements.showStats?.addEventListener("change", handleSettingsChange);
+  elements.errorReporting?.addEventListener("change", handleSettingsChange);
+
+  // FR-C3：全局异常兜底。开关关闭时这两条只会写本地日志，不会外发任何数据。
+  window.addEventListener("error", (event) => {
+    errorReporter.report(event.error || new Error(event.message), { phase: "window.onerror" });
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+    errorReporter.report(reason, { phase: "unhandledrejection" });
+  });
   elements.leftPage.addEventListener("scroll", () => {
     if (isScrollMode()) {
       updateScrollIndicator();

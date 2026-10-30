@@ -49,6 +49,24 @@ export const MESSAGES = {
     readerNextChapter: "Next Chapter",
     readerEmptyPageStart: "Import a TXT file to start reading",
     readerEmptyPageSupport: "Contents, bookmarks, settings, and shortcuts are supported",
+    // FR-M4 边界四态
+    readerStateLoading: "Importing and parsing the file…",
+    readerStateEmpty: "No book imported yet",
+    readerStateImport: "Import a TXT file",
+    readerStateRetry: "Retry",
+    readerErrorEncoding: "Cannot detect the file encoding. Pick one manually and try again.",
+    readerErrorEmptyFile: "The file is empty or has no readable text",
+    readerErrorReadFailed: "Failed to read the file",
+    readerErrorParseFailed: "Failed to parse the file",
+    readerErrorUnknown: "Import failed",
+    // FR-M3 无目录书平铺提示
+    readerFlatBookHint: "No chapter markers found — showing the book as one continuous text",
+    // FR-C3 可选错误上报开关
+    readerErrorReporting: "Anonymous error reporting (off by default)",
+    readerErrorReportingHint:
+      "When enabled, only the app version, platform, and an anonymized stack are sent — never book text, Gist tokens, or any personal information.",
+    readerStateEncodingLabel: "Encoding",
+    readerStateEncodingApply: "Re-import with this encoding",
     readerPrevPage: "Previous Page",
     readerNextPage: "Next Page",
     readerScrollUp: "Scroll Up",
@@ -240,6 +258,24 @@ export const MESSAGES = {
     readerNextChapter: "下一章",
     readerEmptyPageStart: "导入 TXT 后开始阅读",
     readerEmptyPageSupport: "支持目录、书签、设置与快捷键",
+    // FR-M4 边界四态
+    readerStateLoading: "正在导入并解析文件…",
+    readerStateEmpty: "还没有导入任何书籍",
+    readerStateImport: "导入 TXT 文件",
+    readerStateRetry: "重试",
+    readerErrorEncoding: "无法识别文件编码，请手动选择编码后重试",
+    readerErrorEmptyFile: "文件为空或不含可读内容",
+    readerErrorReadFailed: "文件读取失败",
+    readerErrorParseFailed: "文件解析失败",
+    readerErrorUnknown: "导入失败",
+    // FR-M3 无目录书平铺提示
+    readerFlatBookHint: "未识别到章节标记，已按整本平铺阅读",
+    // FR-C3 可选错误上报开关
+    readerErrorReporting: "匿名错误上报（默认关闭）",
+    readerErrorReportingHint:
+      "开启后仅上报版本、平台与匿名错误栈，不含正文、Gist Token 或任何个人信息。",
+    readerStateEncodingLabel: "编码",
+    readerStateEncodingApply: "用此编码重新导入",
     readerPrevPage: "上一页",
     readerNextPage: "下一页",
     readerScrollUp: "上滚",

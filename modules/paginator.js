@@ -121,6 +121,48 @@ export function paginateChapter(content, settings, pageDimensions = null, fitsPa
   return pages.length ? pages : [normalized];
 }
 
+/**
+ * 受上限约束地收集分页结果（FR-M1）。
+ *
+ * 分页器本身是惰性的，但调用方如果直接「要多少就生成多少」，遇到
+ * 恢复阅读进度到大文件深处（例如第 5000 页）时会一次性生成数千页，
+ * 主线程直接卡死。这里强制单次生成量有上限，剩下的交给空闲预热补。
+ *
+ * @param {{ done: boolean, next: () => string|null }} pager
+ * @param {{ requiredCount: number, maxPages?: number }} options
+ * @returns {{ pages: string[], done: boolean, generated: number }}
+ */
+export function collectPages(pager, { requiredCount, maxPages = Number.POSITIVE_INFINITY }) {
+  const pages = [];
+  const limit = Math.max(1, Math.min(requiredCount, maxPages));
+
+  while (!pager.done && pages.length < limit) {
+    const page = pager.next();
+    if (!page) {
+      break;
+    }
+    pages.push(page);
+  }
+
+  return { pages, done: pager.done, generated: pages.length };
+}
+
+/**
+ * 把页码钳制到「已生成页面」范围内并对齐到整幅（spread）起点（FR-M1）。
+ * 渐近分页下总页数在分页完成前是未知的，跳转目标必须按已生成页数收敛，
+ * 否则会渲染出空白页。
+ */
+export function clampSpreadStart(pageIndex, pagesLength, pagesPerView) {
+  const view = Math.max(1, pagesPerView);
+  if (pagesLength <= 0) {
+    return 0;
+  }
+
+  const lastSpreadStart = Math.floor((pagesLength - 1) / view) * view;
+  const clamped = Math.max(0, Math.min(pageIndex, lastSpreadStart));
+  return clamped - (clamped % view);
+}
+
 export function createRenderedChapterPager(content, settings, pageDimensions, fitsPage) {
   const normalized = content.replace(/\r\n/g, "\n").trim();
   return buildRenderedPager(normalized, settings, pageDimensions, fitsPage);

@@ -62,7 +62,7 @@
     <main class="wrap">
       <article class="card">
         <h1>Xyfy TXT Reader 隐私政策</h1>
-        <p class="meta">生效日期：2026-10-28（上次更新：2026-03-28）</p>
+        <p class="meta">生效日期：2026-10-28（上次更新：2026-10-30）</p>
 
         <p>
           Xyfy TXT Reader（以下简称“本扩展”）尊重并保护用户隐私。本政策说明本扩展会收集、处理和存储哪些数据，以及这些数据如何被使用。
@@ -123,12 +123,21 @@
           <li><strong>响应方式</strong>：如对数据处理有疑问或需协助删除，可通过下方联系方式提出，通常在 7 个工作日内回复。</li>
         </ul>
 
-        <h2>8. 政策更新</h2>
+        <h2>8. 错误上报（可选，默认关闭）</h2>
+        <ul>
+          <li><strong>默认关闭</strong>：本扩展的“匿名错误上报”开关出厂即为关闭状态，未开启时不会向任何服务器发送错误信息，异常仅记录在本机控制台，便于用户自行排查。</li>
+          <li><strong>开启后上报的内容</strong>：仅包含应用版本号、浏览器名称与大版本号（如 <code>Chrome/141</code>）、错误类型、错误名称、错误消息、已匿名化的调用栈（去掉域名、本机用户名与绝对路径）、事件发生时间戳，以及少量技术性上下文（如出错阶段、章节序号）。</li>
+          <li><strong>明确不包含</strong>：TXT 正文、书名、文件名、Gist Token 或任何凭证、邮箱等个人信息。上下文采用“键名白名单 + 值形态校验”双重过滤，白名单外的字段一律丢弃。</li>
+          <li><strong>随时关闭</strong>：在“设置 → 常规”中取消勾选即可立即停止上报，关闭后不再发送任何数据。</li>
+          <li><strong>历史版本说明</strong>：若当前版本尚未接入上报端点，即便开启开关也只会本地记录，不会对外发送。</li>
+        </ul>
+
+        <h2>9. 政策更新</h2>
         <p>
           当功能或数据处理方式发生变化时，本页面会同步更新并标注新的生效日期。
         </p>
 
-        <h2>9. 联系方式</h2>
+        <h2>10. 联系方式</h2>
         <ul>
           <li>开发者：Xyfy TXT Reader 项目维护者（GitHub 账号 <a href="https://github.com/xyfy">xyfy</a>）</li>
           <li>问题反馈：<a href="https://github.com/xyfy/Xyfy.TxtReader/issues">https://github.com/xyfy/Xyfy.TxtReader/issues</a></li>
@@ -138,7 +147,7 @@
         <hr class="lang-divider" />
 
         <h1>Privacy Policy (English)</h1>
-        <p class="meta">Effective date: 2026-10-28 (last updated: 2026-03-28)</p>
+        <p class="meta">Effective date: 2026-10-28 (last updated: 2026-10-30)</p>
 
         <p>
           Xyfy TXT Reader (the "Extension") respects your privacy. This policy explains what data is processed and where it is stored.
@@ -199,12 +208,21 @@
           <li><strong>Response time</strong>: questions or deletion requests made through the contact below are typically answered within 7 business days.</li>
         </ul>
 
-        <h2>8. Policy Updates</h2>
+        <h2>8. Error Reporting (Optional, Off by Default)</h2>
+        <ul>
+          <li><strong>Off by default</strong>: the "Anonymous error reporting" toggle ships disabled. When it is off, nothing is sent to any server; errors are only logged locally in the console.</li>
+          <li><strong>What is sent when enabled</strong>: app version, browser name and major version (e.g. <code>Chrome/141</code>), error type, error name, error message, an anonymised stack trace (domain, local username and absolute paths removed), the timestamp, and a small amount of technical context such as the failing phase or chapter index.</li>
+          <li><strong>What is never sent</strong>: TXT content, book or file names, Gist tokens or any credentials, email addresses, or any other personal data. Context is filtered twice — by an allow-list of keys and by a strict value shape check; anything outside the allow-list is dropped.</li>
+          <li><strong>Opt out at any time</strong>: uncheck the toggle in Settings → General to stop reporting immediately.</li>
+          <li><strong>Current status</strong>: if no reporting endpoint is bundled with the current version, enabling the toggle still results in local logging only.</li>
+        </ul>
+
+        <h2>9. Policy Updates</h2>
         <p>
           This page will be updated when data handling changes, with a new effective date.
         </p>
 
-        <h2>9. Contact</h2>
+        <h2>10. Contact</h2>
         <ul>
           <li>Developer: maintainer of Xyfy TXT Reader (GitHub account <a href="https://github.com/xyfy">xyfy</a>)</li>
           <li>Issues: <a href="https://github.com/xyfy/Xyfy.TxtReader/issues">https://github.com/xyfy/Xyfy.TxtReader/issues</a></li>
