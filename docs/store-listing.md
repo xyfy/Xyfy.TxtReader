@@ -29,8 +29,13 @@ Xyfy TXT Reader 是一个面向本地 TXT 文件的浏览器阅读扩展。你�
 - 自定义快捷键：逐项重绑，冲突键位实时拦截，可一键恢复默认
 - 自定义模板颜色：主题可选“自定义”，分别调整背景、纸面、正文、次要、强调、强强调 6 个颜色
 - 自定义字体：预设之外可填写任意字体栈，实时预览，非法值自动回退
+- 编码自动识别：UTF-8 / UTF-16 / GB18030 / Big5 自动探测，识别不了时可手动选编码重导入
+- 无目录书也能读：通篇没有章节标记的书按段落平铺，不切断段落
+- 大文件稳定：分页分批生成，恢复阅读进度到深处不卡界面
 
 隐私与数据：
+
+- 可选的匿名错误上报默认关闭，开启后仅上报版本、平台与匿名错误栈
 
 - 正文和主要阅读数据默认保存在本地浏览器存储
 - 不上传用户 TXT 正文到开发者服务器
@@ -54,15 +59,30 @@ Key features:
 - Custom keyboard shortcuts with conflict detection and one-click reset
 - Custom theme colors: adjust background, surface, text, muted, accent and strong accent
 - Custom font stack with live preview and safe fallback
+- Automatic encoding detection for UTF-8 / UTF-16 / GB18030 / Big5, with manual override when detection fails
+- Books without chapter markers are laid out flat along paragraph boundaries, never cutting a paragraph in half
+- Stable large-file pagination: pages are generated in batches, so resuming deep into a big file stays responsive
 
 Privacy and data handling:
 
 - Main content and reading data stay in local browser storage
 - No TXT body upload to developer servers
+- Optional anonymous error reporting is off by default; when enabled it sends only version, platform and an anonymised stack
 - If cloud backup is enabled, backups are stored in the user's own GitHub Gist, not developer storage
 - Permissions are used for local data storage; Gist access uses a user-provided token
 
 ## 更新日志模板
+
+版本 0.6.0
+
+- 新增：编码自动识别与防乱码，支持 UTF-8 / UTF-16 / GB18030 / Big5，识别不了时可手动选编码重导入
+- 新增：没有章节标记的书自动按段落平铺阅读，并提示未识别到章节
+- 新增：加载中 / 空 / 错误 / 阅读中四种状态各有明确界面，导入失败不再一片空白，给出原因与重试
+- 新增：可选的匿名错误上报开关（默认关闭），开启后仅上报版本、平台与匿名错误栈，不含正文与任何个人信息
+- 优化：大文件分页改为分批生成，恢复阅读进度到深处不再卡住界面
+- 修复：翻页到未生成区域时偶发空白页
+- 修复：无目录书平铺时把段落切成两半
+- 修复：导入损坏文件时会静默失败，界面停在上一本书
 
 版本 0.5.0
 

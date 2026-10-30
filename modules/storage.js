@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS = {
   animationStyle: "slide",
   animationIntensity: 2,
   showStats: false,
+  // FR-C3：匿名错误上报，默认关闭。旧设置升级时由 normalizeStoredSettings 自动补全为 false
+  errorReporting: false,
   keybindings: structuredCloneKeybindings()
 };
 

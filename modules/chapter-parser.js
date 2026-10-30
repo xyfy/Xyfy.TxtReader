@@ -1,7 +1,33 @@
+// FR-M3 章节识别与无目录书兜底
+//
+// 两类输入：
+//   1. 有章节标记的小说（"第X章"、"Chapter 1"）→ 按标题行精确切分
+//   2. 完全没有章节标记的小说 → 整本按段落边界平铺，并标记 isFallback 供界面提示
+//
+// 标题行识别的两条硬约束（都是踩过的坑）：
+//   - 必须是独占一行：^...$ 配合 m 标志，避免正文长句被误判成标题
+//   - 必须够短：超长"标题"基本都是误命中
+
+const MAX_TITLE_LENGTH = 60;
+const LEADING_SPACE = "[ \\t\\u3000]*";
+const FALLBACK_CHUNK_SIZE = 12000;
+
 const CHAPTER_PATTERNS = [
-  /^(第[零一二三四五六七八九十百千万亿两\d]{1,12}[章节回卷部节篇])\s*(.*)$/gm,
-  /^(序章|楔子|尾声|番外|后记|终章)\s*(.*)$/gm,
-  /^(chapter\s+\d+[\s.:：-]*.*)$/gim
+  // 第X章 / 第X节 / 第X回 / 第X卷 / 第X部 / 第X篇（中文数字或阿拉伯数字）
+  new RegExp(
+    `^${LEADING_SPACE}(第[零一二三四五六七八九十百千万亿两\\d]{1,12}[章节回卷部节篇])[^\\n]{0,${MAX_TITLE_LENGTH}}$`,
+    "gm"
+  ),
+  // 序章 / 楔子 / 尾声 等常见非编号标题
+  new RegExp(
+    `^${LEADING_SPACE}(序章|序言|楔子|引子|尾声|终章|番外|后记|自序|简介)[^\\n]{0,${MAX_TITLE_LENGTH}}$`,
+    "gm"
+  ),
+  // Chapter 1 / Part II / Section 3（英文与罗马数字）
+  new RegExp(
+    `^${LEADING_SPACE}(chapter|part|section)\\s+([0-9]+|[ivxlcIVXLC]+)[^\\n]{0,${MAX_TITLE_LENGTH}}$`,
+    "gim"
+  )
 ];
 
 function collectMatches(text) {
@@ -13,6 +39,7 @@ function collectMatches(text) {
         index: match.index ?? 0
       });
     }
+    // 单命中不足以成"目录"，至少两处才认为是章节结构
     if (matches.length >= 2) {
       return matches;
     }
@@ -21,44 +48,94 @@ function collectMatches(text) {
   return [];
 }
 
-function fallbackChapters(text, chunkSize = 12000) {
-  const chapters = [];
+/** 在 [from, limit) 内找最近的段落边界，优先空行（\n\n），其次换行（\n） */
+function findParagraphBreak(text, from, limit) {
+  const window = text.slice(from, limit);
+  const doubleBreak = window.indexOf("\n\n");
+  if (doubleBreak !== -1) {
+    return from + doubleBreak + 2;
+  }
+  const singleBreak = window.indexOf("\n");
+  if (singleBreak !== -1) {
+    return from + singleBreak + 1;
+  }
+  return -1;
+}
 
-  for (let start = 0; start < text.length; start += chunkSize) {
-    const end = Math.min(start + chunkSize, text.length);
+/**
+ * 无目录书的兜底：按段落边界平铺，保证不把段落切成两半。
+ * 切点优先落在 [chunkSize*0.8, chunkSize*1.3] 窗口内的第一个段落边界上，
+ * 窗口内找不到边界时（例如整段超长无换行）才退化为硬切。
+ */
+function fallbackChapters(text, chunkSize = FALLBACK_CHUNK_SIZE) {
+  const chapters = [];
+  const push = (start, end) => {
+    const content = text.slice(start, end).trim();
+    if (!content.length) {
+      return;
+    }
     chapters.push({
       id: `fallback-${start}`,
       title: `第 ${chapters.length + 1} 部分`,
       start,
       end,
-      content: text.slice(start, end).trim()
+      content
     });
+  };
+
+  let start = 0;
+  while (start < text.length) {
+    if (text.length - start <= chunkSize) {
+      push(start, text.length);
+      break;
+    }
+
+    const searchFrom = start + Math.floor(chunkSize * 0.8);
+    const searchLimit = Math.min(text.length, start + Math.floor(chunkSize * 1.3));
+    const breakAt = findParagraphBreak(text, searchFrom, searchLimit);
+    const end = breakAt > start ? breakAt : start + chunkSize;
+
+    push(start, end);
+    start = end;
   }
 
   return chapters;
 }
 
-export function parseChapters(text) {
+/**
+ * 解析章节并返回是否走了兜底。
+ * @returns {{ chapters: Array<{id:string,title:string,start:number,end:number,content:string}>,
+ *             isFallback: boolean }}
+ */
+export function parseChaptersWithMeta(text) {
   const normalized = text.replace(/\r\n/g, "\n").trim();
   const matches = collectMatches(normalized);
 
   if (!matches.length) {
-    return fallbackChapters(normalized);
+    return { chapters: fallbackChapters(normalized), isFallback: true };
   }
 
-  const chapters = matches.map((entry, index) => {
-    const start = entry.index;
-    const end = matches[index + 1]?.index ?? normalized.length;
-    const content = normalized.slice(start, end).trim();
+  const chapters = matches
+    .map((entry, index) => {
+      const start = entry.index;
+      const end = matches[index + 1]?.index ?? normalized.length;
+      return {
+        id: `chapter-${index + 1}`,
+        title: entry.title,
+        start,
+        end,
+        content: normalized.slice(start, end).trim()
+      };
+    })
+    .filter((chapter) => chapter.content.length > 0);
 
-    return {
-      id: `chapter-${index + 1}`,
-      title: entry.title,
-      start,
-      end,
-      content
-    };
-  });
+  if (!chapters.length) {
+    return { chapters: fallbackChapters(normalized), isFallback: true };
+  }
 
-  return chapters.filter((chapter) => chapter.content.length > 0);
+  return { chapters, isFallback: false };
+}
+
+export function parseChapters(text) {
+  return parseChaptersWithMeta(text).chapters;
 }

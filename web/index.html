@@ -94,6 +94,26 @@
           </article>
         </section>
 
+        <!-- FR-M4 边界四态：加载中 / 空 / 错误（错误态含原因与重试） -->
+        <div id="reader-state-overlay" class="reader-state-overlay hidden" role="status" aria-live="polite">
+          <div id="state-loading" class="state-panel hidden" data-i18n="readerStateLoading">Importing and parsing the file…</div>
+          <div id="state-empty" class="state-panel hidden">
+            <p data-i18n="readerStateEmpty">No book imported yet</p>
+            <button id="state-empty-import" type="button" data-i18n="readerStateImport">Import a TXT file</button>
+          </div>
+          <div id="state-error" class="state-panel hidden">
+            <p id="state-error-reason" class="state-error-reason"></p>
+            <div id="state-error-encoding-row" class="state-error-encoding-row hidden">
+              <label>
+                <span data-i18n="readerStateEncodingLabel">Encoding</span>
+                <select id="state-error-encoding"></select>
+              </label>
+              <button id="state-error-encoding-apply" type="button" data-i18n="readerStateEncodingApply">Re-import with this encoding</button>
+            </div>
+            <button id="state-error-retry" type="button" data-i18n="readerStateRetry">Retry</button>
+          </div>
+        </div>
+
         <footer class="reader-footer">
           <div class="nav-group">
             <button id="prev-page" type="button" data-i18n="readerPrevPage">Previous Page</button>
@@ -176,6 +196,11 @@
                 <input id="show-stats" type="checkbox" />
                 <span data-i18n="readerManageShowStats">显示统计信息</span>
               </label>
+              <label class="settings-switch">
+                <input id="error-reporting" type="checkbox" />
+                <span data-i18n="readerErrorReporting">匿名错误上报（默认关闭）</span>
+              </label>
+              <p class="settings-hint" data-i18n="readerErrorReportingHint">开启后仅上报版本、平台与匿名错误栈，不含正文、Gist Token 或任何个人信息。</p>
             </section>
             <section id="settings-backup" class="settings-section">
               <div class="section-head">
