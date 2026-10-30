@@ -32,6 +32,12 @@ Xyfy TXT Reader 是一个面向本地 TXT 文件的浏览器阅读扩展。你�
 - 编码自动识别：UTF-8 / UTF-16 / GB18030 / Big5 自动探测，识别不了时可手动选编码重导入
 - 无目录书也能读：通篇没有章节标记的书按段落平铺，不切断段落
 - 大文件稳定：分页分批生成，恢复阅读进度到深处不卡界面
+- 首次引导：首次安装走三步引导，按窗口大小和触屏状态推荐合适的字号与版式
+- 阅读统计：按天记录阅读时长与字数，给出阅读速度、本章剩余时长和连续阅读天数
+- 三档场景模式：日间 / 夜间 / 护眼一键切换，手调后自动取消高亮
+- 批量导入：多选文件或直接拖入窗口，非 TXT、空文件、超大文件逐条给出原因，最近导入可一键重开
+- 多设备同步冲突：两侧短时间改过不同内容时给出冲突条，可保留一侧或逐项取较新
+- 无障碍：支持键盘完整操作、可见焦点环、浮层焦点陷阱、页码朗读，三套预设主题对比度达 WCAG AA
 
 隐私与数据：
 
@@ -62,6 +68,12 @@ Key features:
 - Automatic encoding detection for UTF-8 / UTF-16 / GB18030 / Big5, with manual override when detection fails
 - Books without chapter markers are laid out flat along paragraph boundaries, never cutting a paragraph in half
 - Stable large-file pagination: pages are generated in batches, so resuming deep into a big file stays responsive
+- First-run onboarding with device-aware defaults for font size, line height and pages per view
+- Reading stats: daily duration and character counts, reading speed, chapter time left, and reading streak
+- Three scene presets (day / night / eye-care) with one-tap switching and auto-unhighlight after manual tweaks
+- Batch import by multi-select or drag-and-drop, with per-file rejection reasons and a recent-files list
+- Sync conflict banner when two devices change different settings within minutes; keep either side or merge field by field
+- Accessibility: full keyboard operation, visible focus ring, dialog focus trap, page-number announcements, and WCAG AA contrast in all preset themes
 
 Privacy and data handling:
 
@@ -72,6 +84,17 @@ Privacy and data handling:
 - Permissions are used for local data storage; Gist access uses a user-provided token
 
 ## 更新日志模板
+
+版本 0.7.0
+
+- 新增：首次安装三步引导（导入 → 阅读 → 备份），并按窗口大小与触屏状态推荐字号、行高、每屏页数，已调过版式的用户不会被覆盖
+- 新增：阅读统计细化，按天累计阅读时长与字数，显示阅读速度、本章剩余时长与连续阅读天数
+- 新增：三档场景模式（日间 / 夜间 / 护眼），一键切换主题、字号与行高；手动微调后取消高亮，自定义配色切场景前先确认
+- 新增：批量导入与拖拽投放，逐条给出拒绝原因（非 TXT / 空文件 / 超过 20 MB），队列串行且单个失败不中断，最近导入保留 8 条
+- 新增：多设备同步冲突提示，可选保留本地 / 保留云端 / 逐字段取较新，键位映射按动作合并而非整片覆盖
+- 新增：无障碍支持，跳转到正文链接、全局可见焦点环、浮层焦点陷阱、页码朗读，三套预设主题对比度全部达 WCAG AA
+- 修复：护眼主题次要文字对比度仅 4.42:1，未达 AA 标准，已调整为 4.82:1
+- 优化：`Esc` 优先关闭最上层浮层，关闭后焦点回到打开它的元素
 
 版本 0.6.0
 

@@ -36,6 +36,8 @@ body[data-theme="sepia"] {
   --bg-color: #d9c4a6;
   --surface-color: #f3e6cb;
   --text-color: #3a2a16;
+  /* 沿用全局 #7a6651 时只有 4.42:1，略低于 AA 4.5；压深到 4.82:1，观感几乎无差别 */
+  --muted-color: #75604a;
   --accent-color: #8c5227;
 }
 
@@ -316,6 +318,7 @@ select {
 }
 
 .reader-shell {
+  position: relative;
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 18px;
@@ -338,6 +341,11 @@ body.is-immersive .reader-shell {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
+}
+
+/* 冲突条整行换行，不挤占标题与按钮 */
+.reader-header {
+  flex-wrap: wrap;
 }
 
 .reader-header h1 {
@@ -1244,4 +1252,184 @@ body.is-immersive .immersive-exit.hidden {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: center;
+}
+
+/* ===== v0.7 ===== */
+
+/* FR-S4 跳到正文：默认移出视口，获得焦点才滑入 */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 60;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--accent-strong);
+  color: #fff;
+  font-size: 14px;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 0.16s ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* FR-S4 键盘焦点必须可见：鼠标点击不显示，键盘导航才显示 */
+:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+body[data-theme="night"] :focus-visible {
+  outline-color: var(--accent-color);
+}
+
+/* 正文容器可被 skip-link 定位，但不进入 Tab 序列 */
+#reader-main:focus {
+  outline: none;
+}
+
+/* FR-C2 场景模式 */
+.scene-group {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--control-bg);
+}
+
+.scene-chip {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-color);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.scene-chip:hover {
+  color: var(--text-color);
+}
+
+.scene-chip[aria-pressed="true"] {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+/* FR-C1 拖拽落区提示 */
+.drop-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(44, 35, 27, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.drop-hint p {
+  padding: 18px 28px;
+  border: 2px dashed rgba(255, 255, 255, 0.75);
+  border-radius: 14px;
+  color: #fff;
+  font-size: 18px;
+}
+
+/* FR-S3 冲突裁决条 */
+.conflict-banner {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--accent-color);
+  border-radius: 10px;
+  background: var(--control-bg);
+}
+
+.conflict-text {
+  min-width: 220px;
+  flex: 1 1 320px;
+}
+
+.conflict-title {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.conflict-detail {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted-color);
+}
+
+.conflict-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* FR-S1 引导浮层 */
+.onboarding-card {
+  max-width: 460px;
+  text-align: left;
+}
+
+.onboarding-progress {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-color);
+}
+
+#onboarding-title {
+  margin: 0 0 10px;
+  font-size: 21px;
+  line-height: 1.35;
+  color: var(--text-color);
+}
+
+.onboarding-body {
+  margin: 0 0 20px;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text-color);
+}
+
+.onboarding-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* FR-S4 无障碍分区：对比度结论 */
+.a11y-contrast-status {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.a11y-contrast-status.is-warning {
+  color: #b5442a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link,
+  .scene-chip {
+    transition: none;
+  }
 }

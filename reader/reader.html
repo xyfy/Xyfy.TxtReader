@@ -7,15 +7,25 @@
     <link rel="stylesheet" href="reader.css" />
   </head>
   <body>
+    <!-- FR-S4：键盘用户首次 Tab 即可跳过侧栏直达正文 -->
+    <a id="skip-to-content" class="skip-link" href="#reader-main" data-i18n="a11ySkipToContent">跳到正文</a>
     <div class="app-shell">
       <aside class="side-panel">
         <section class="panel-block">
           <p class="panel-label" data-i18n="readerImportLabel">Import</p>
           <label class="file-picker">
-            <input id="file-input" type="file" accept=".txt,text/plain,application/octet-stream" />
+            <input id="file-input" type="file" accept=".txt,text/plain,application/octet-stream" multiple />
             <span data-i18n="readerChooseLocalTxt">Choose local TXT</span>
           </label>
           <p id="file-meta" class="file-meta" data-i18n="readerNoFile">No file imported yet</p>
+        </section>
+
+        <!-- FR-C1：最近导入，容量 8，按名称+大小去重 -->
+        <section class="panel-block">
+          <div class="section-head">
+            <p class="panel-label" data-i18n="importRecentFiles">Recently imported</p>
+          </div>
+          <div id="recent-files-list" class="list"></div>
         </section>
 
         <section class="panel-block">
@@ -57,13 +67,19 @@
         </section>
       </aside>
 
-      <main class="reader-shell">
+      <main id="reader-main" class="reader-shell" tabindex="-1">
         <header class="reader-header">
           <div>
             <p class="eyebrow" data-i18n="readerHeaderEyebrow">Book View</p>
             <h1 id="book-title">Xyfy TXT Reader</h1>
           </div>
           <div class="header-actions">
+            <!-- FR-C2：三档场景一键切换，手调版式后自动取消高亮 -->
+            <div id="scene-mode-group" class="scene-group" role="group" data-i18n-attr="aria-label:sceneLabel">
+              <button id="scene-day" class="scene-chip" type="button" data-scene="day" aria-pressed="false" data-i18n="sceneDay">Day</button>
+              <button id="scene-night" class="scene-chip" type="button" data-scene="night" aria-pressed="false" data-i18n="sceneNight">Night</button>
+              <button id="scene-eye-care" class="scene-chip" type="button" data-scene="eyeCare" aria-pressed="false" data-i18n="sceneEyeCare">Eye care</button>
+            </div>
             <label class="inline-language">
               <span data-i18n="readerLanguageLabel">语言</span>
               <select id="language-select">
@@ -80,6 +96,19 @@
             <button id="debug-toggle" type="button" title="Pagination debug panel" data-i18n="readerDebugButton" data-i18n-attr="title:readerDebugTitle">Debug</button>
             <button id="prev-chapter" type="button" data-i18n="readerPrevChapter">Previous Chapter</button>
             <button id="next-chapter" type="button" data-i18n="readerNextChapter">Next Chapter</button>
+          </div>
+
+          <!-- FR-S3：多设备在 5 分钟内各改不同设置时的裁决条，整行换行显示 -->
+          <div id="sync-conflict-banner" class="conflict-banner hidden" role="alert">
+            <div class="conflict-text">
+              <p class="conflict-title" data-i18n="conflictTitle">Settings changed on another device</p>
+              <p id="conflict-detail" class="conflict-detail"></p>
+            </div>
+            <div class="conflict-actions">
+              <button id="conflict-keep-local" type="button" class="small-button" data-i18n="conflictKeepLocal">Keep this device</button>
+              <button id="conflict-keep-remote" type="button" class="small-button" data-i18n="conflictKeepRemote">Keep cloud</button>
+              <button id="conflict-merge" type="button" class="small-button" data-i18n="conflictMerge">Merge both</button>
+            </div>
           </div>
         </header>
 
@@ -114,10 +143,15 @@
           </div>
         </div>
 
+        <!-- FR-C1：拖拽落区提示，仅拖拽悬停时出现 -->
+        <div id="drop-hint" class="drop-hint hidden" aria-hidden="true">
+          <p data-i18n="importDropHint">Drop TXT files to import</p>
+        </div>
+
         <footer class="reader-footer">
           <div class="nav-group">
             <button id="prev-page" type="button" data-i18n="readerPrevPage">Previous Page</button>
-            <span id="page-indicator">0 / 0</span>
+            <span id="page-indicator" aria-live="polite" aria-atomic="true">0 / 0</span>
             <button id="next-page" type="button" data-i18n="readerNextPage">Next Page</button>
             <span id="mode-hint" class="mode-hint hidden" aria-live="polite"></span>
           </div>
@@ -188,6 +222,7 @@
                 <button class="settings-nav-chip" type="button" data-target="settings-font" data-i18n="navFont">字体</button>
                 <button class="settings-nav-chip" type="button" data-target="settings-color" data-i18n="navColor">配色</button>
                 <button class="settings-nav-chip" type="button" data-target="settings-shortcuts" data-i18n="navShortcuts">按键</button>
+                <button class="settings-nav-chip" type="button" data-target="settings-a11y" data-i18n="a11ySection">无障碍</button>
                 <button class="settings-nav-chip" type="button" data-target="settings-cloud" data-i18n="navCloud">云备份</button>
               </nav>
             </div>
@@ -278,6 +313,14 @@
               <p id="key-rebind-hint" class="file-meta" data-i18n="actRebindingHint">点击「重新绑定」后按下新组合键；按 Esc 取消。Tab / Space / 方向键允许但会提示系统语义。</p>
               <div id="shortcut-list" class="shortcut-list"></div>
             </section>
+            <section id="settings-a11y" class="settings-section">
+              <div class="section-head">
+                <p class="panel-label" data-i18n="a11ySection">无障碍</p>
+              </div>
+              <!-- FR-S4：实时显示当前配色最低对比度，不达标时列出数量 -->
+              <p id="a11y-contrast-status" class="file-meta a11y-contrast-status" aria-live="polite"></p>
+              <p class="settings-hint" data-i18n="a11yFocusHint">Press Tab to move focus, Esc to close</p>
+            </section>
             <section id="settings-cloud" class="settings-section">
               <button id="cloud-section-toggle" class="settings-section-toggle" type="button" aria-expanded="false" aria-controls="cloud-section-body">
                 <span class="panel-label" data-i18n="readerCloudBackup">云备份</span>
@@ -312,6 +355,18 @@
                 <p id="cloud-status" class="file-meta" data-i18n="readerCloudStatusHint">填写你自己的 Gist ID 和 Token，备份写入你的 Gist</p>
               </div>
             </section>
+          </div>
+        </div>
+        <!-- FR-S1：首次引导，三步走完或跳过都不再出现 -->
+        <div id="onboarding-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" aria-describedby="onboarding-body">
+          <div class="overlay-card onboarding-card">
+            <p id="onboarding-progress" class="onboarding-progress"></p>
+            <h2 id="onboarding-title"></h2>
+            <p id="onboarding-body" class="onboarding-body"></p>
+            <div class="onboarding-actions">
+              <button id="onboarding-skip" type="button" class="small-button" data-i18n="onboardingSkip">Skip</button>
+              <button id="onboarding-next" type="button" data-i18n="onboardingNext">Next</button>
+            </div>
           </div>
         </div>
         <button id="immersive-exit" class="immersive-exit icon-button hidden" type="button" title="Exit immersive mode" aria-label="Exit immersive mode" data-i18n-attr="title:readerImmersiveExit;aria-label:readerImmersiveExit">

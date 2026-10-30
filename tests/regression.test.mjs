@@ -18,6 +18,7 @@ import {
   matchKeyBinding
 } from "../modules/keyboard-map.js";
 import { getDefaultSettings, normalizeStoredSettings } from "../modules/storage.js";
+import { SCENE_PRESETS } from "../modules/scene-mode.js";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const readHtml = (relative) => readFileSync(join(projectRoot, relative), "utf8");
@@ -201,6 +202,76 @@ function run() {
     assert.ok(key in MESSAGES.zh_CN, `zh_CN 缺少 v0.6 文案：${key}`);
   }
   console.log(`✓ TC-CMP-02 双 locale：${enKeys.length} 个文案键完全一致且无空值`);
+
+  // ---------- TC-REG-06 v0.7 六个功能「确实接线」----------
+  // 模块写完没人调用是最容易发生的假完成：单元测试全绿，功能在界面上根本不存在。
+  // 这里同时检查「HTML 有控件」与「reader.js 真的引用并调用了模块函数」，两头都堵。
+  {
+    const htmlByFile = {
+      "reader/reader.html": readFileSync(join(projectRoot, "reader/reader.html"), "utf8"),
+      "web/index.html": readFileSync(join(projectRoot, "web/index.html"), "utf8")
+    };
+    const readerJs = readFileSync(join(projectRoot, "reader/reader.js"), "utf8");
+
+    for (const [file, html] of Object.entries(htmlByFile)) {
+      // FR-C2：场景按钮必须与 SCENE_PRESETS 一一对应，少一个就是漏了某个场景
+      const sceneIds = [...html.matchAll(/class="scene-chip"[^>]*data-scene="([^"]+)"/g)].map((m) => m[1]);
+      assert.deepEqual(sceneIds, Object.keys(SCENE_PRESETS), `${file}: 场景按钮与 SCENE_PRESETS 不一致`);
+
+      // FR-S1：引导浮层必须具备对话框语义，否则读屏用户不知道它是个弹窗
+      assert.ok(/id="onboarding-overlay"[^>]*role="dialog"/.test(html), `${file}: 引导浮层缺少 role="dialog"`);
+      assert.ok(/id="onboarding-overlay"[^>]*aria-modal="true"/.test(html), `${file}: 引导浮层缺少 aria-modal`);
+      assert.ok(html.includes('id="onboarding-progress"'), `${file}: 缺少引导进度`);
+      assert.ok(html.includes('id="onboarding-next"'), `${file}: 缺少引导下一步按钮`);
+
+      // FR-C1：拖拽落区、最近文件、多选
+      assert.ok(html.includes('id="drop-hint"'), `${file}: 缺少拖拽提示层`);
+      assert.ok(html.includes('id="recent-files-list"'), `${file}: 缺少最近文件列表`);
+      assert.ok(/id="file-input"[^>]*\bmultiple\b/.test(html), `${file}: 文件选择未开启多选`);
+
+      // FR-S3：三种裁决策略的按钮必须齐全
+      for (const id of ["conflict-keep-local", "conflict-keep-remote", "conflict-merge"]) {
+        assert.ok(html.includes(`id="${id}"`), `${file}: 缺少冲突裁决按钮 ${id}`);
+      }
+      assert.ok(html.includes('id="sync-conflict-banner"'), `${file}: 缺少冲突条`);
+
+      // FR-S4：跳转链接、页码播报、对比度展示位
+      assert.ok(html.includes('id="skip-to-content"'), `${file}: 缺少跳到正文链接`);
+      assert.ok(/id="page-indicator"[^>]*aria-live="polite"/.test(html), `${file}: 页码未做 aria-live 播报`);
+      assert.ok(html.includes('id="a11y-contrast-status"'), `${file}: 缺少无障碍对比度状态位`);
+    }
+
+    // reader.js 必须真的 import 并调用每个模块的关键函数
+    const wiring = [
+      ["onboarding", "shouldShowOnboarding"],
+      ["onboarding", "applyRecommendation"],
+      ["onboarding", "markOnboardingDone"],
+      ["reading-stats", "recordSession"],
+      ["reading-stats", "summarize"],
+      ["sync-conflict", "detectConflict"],
+      ["sync-conflict", "resolveConflict"],
+      ["a11y", "createFocusTrap"],
+      ["a11y", "auditPalette"],
+      ["import-queue", "classifyDroppedFiles"],
+      ["import-queue", "createImportQueue"],
+      ["import-queue", "pushRecentFile"],
+      ["scene-mode", "applyScene"],
+      ["scene-mode", "detectScene"]
+    ];
+    for (const [moduleName, fn] of wiring) {
+      assert.ok(
+        readerJs.includes(`"../modules/${moduleName}.js"`),
+        `reader.js 未引入 ${moduleName}.js`
+      );
+      // 调用形态：`fnName(`，排除只出现在 import 列表里的情况
+      assert.ok(
+        new RegExp(`\\b${fn}\\s*\\(`).test(readerJs),
+        `reader.js 引入了 ${moduleName}.js 却没有调用 ${fn}`
+      );
+    }
+
+    console.log(`✓ TC-REG-06 v0.7 六个功能均已接线（场景/引导/拖拽/冲突/无障碍），非空壳`);
+  }
 
   // ---------- 版本号一致性：发版最容易漏掉的就是某处没跟着改 ----------
   const pkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf8"));

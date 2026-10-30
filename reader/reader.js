@@ -26,16 +26,56 @@ import {
   getDefaultSettings,
   getProgress,
   getReaderSettings,
+  getReadingStats,
+  getRecentFiles,
   importBackupSnapshot,
   listAllProgress,
   listBookmarks,
   listBooks,
+  readSettingsSnapshot,
   resetReaderData,
   saveBook,
   saveBookmark,
   saveProgress,
-  saveReaderSettings
+  saveReaderSettings,
+  saveReadingStats,
+  saveRecentFiles,
+  saveResolvedSettings
 } from "../modules/storage.js";
+import {
+  applyRecommendation,
+  getStep,
+  markOnboardingDone,
+  nextStepIndex,
+  recommendDefaults,
+  shouldShowOnboarding
+} from "../modules/onboarding.js";
+import {
+  IDLE_TIMEOUT_MS,
+  MIN_SESSION_MS,
+  createStats,
+  estimateRemaining,
+  pruneHistory,
+  recordSession,
+  splitDuration,
+  summarize
+} from "../modules/reading-stats.js";
+import { FIELD_LABEL_KEY, detectConflict, resolveConflict, summarizeConflict } from "../modules/sync-conflict.js";
+import { auditPalette, createFocusTrap } from "../modules/a11y.js";
+import {
+  REJECT_MESSAGE_KEY,
+  classifyDroppedFiles,
+  createImportQueue,
+  listRecentFiles,
+  pushRecentFile,
+  toRecentEntry
+} from "../modules/import-queue.js";
+import {
+  applyScene,
+  detectScene,
+  restoreCustomPalette,
+  shouldWarnCustomPalette
+} from "../modules/scene-mode.js";
 import { READER_ACTIONS, formatActionBindings, matchKeyBinding } from "../modules/keyboard-map.js";
 import {
   COLOR_KEYS,
@@ -87,7 +127,18 @@ const state = {
   },
   cloudTokenVisible: false,
   cloudAuthed: false,
-  cloudOperationInProgress: false
+  cloudOperationInProgress: false,
+  // FR-S1 引导
+  onboardingStep: 0,
+  // FR-S2 阅读统计：stats 是持久化结构，session 是当前进行中的一段
+  readingStats: createStats(),
+  session: null,
+  sessionCharsStart: 0,
+  lastActivityAt: 0,
+  // FR-S3 冲突
+  pendingConflict: null,
+  // FR-C1 最近文件
+  recentFiles: []
 };
 
 const PAGE_CACHE_LIMIT = 8;
@@ -193,7 +244,29 @@ const elements = {
   stateErrorEncodingRow: document.getElementById("state-error-encoding-row"),
   stateErrorEncoding: document.getElementById("state-error-encoding"),
   stateErrorEncodingApply: document.getElementById("state-error-encoding-apply"),
-  stateErrorRetry: document.getElementById("state-error-retry")
+  stateErrorRetry: document.getElementById("state-error-retry"),
+  // FR-C2 场景模式
+  sceneModeGroup: document.getElementById("scene-mode-group"),
+  // FR-C1 批量导入与最近文件
+  recentFilesList: document.getElementById("recent-files-list"),
+  dropHint: document.getElementById("drop-hint"),
+  // FR-S3 冲突裁决
+  conflictBanner: document.getElementById("sync-conflict-banner"),
+  conflictDetail: document.getElementById("conflict-detail"),
+  conflictKeepLocal: document.getElementById("conflict-keep-local"),
+  conflictKeepRemote: document.getElementById("conflict-keep-remote"),
+  conflictMerge: document.getElementById("conflict-merge"),
+  // FR-S1 引导浮层
+  onboardingOverlay: document.getElementById("onboarding-overlay"),
+  onboardingProgress: document.getElementById("onboarding-progress"),
+  onboardingTitle: document.getElementById("onboarding-title"),
+  onboardingBody: document.getElementById("onboarding-body"),
+  onboardingSkip: document.getElementById("onboarding-skip"),
+  onboardingNext: document.getElementById("onboarding-next"),
+  // FR-S4 无障碍
+  a11yContrastStatus: document.getElementById("a11y-contrast-status"),
+  skipToContent: document.getElementById("skip-to-content"),
+  readerMain: document.getElementById("reader-main")
 };
 
 let resizeTimer = null;
@@ -201,6 +274,13 @@ let modeHintTimer = null;
 let warmupTimer = null;
 let shortcutsOpen = false;
 let settingsOpen = false;
+let onboardingOpen = false;
+
+// FR-S4：三个浮层共用焦点陷阱，Tab 在浮层内循环，关闭后焦点归还触发元素。
+// Escape 的关闭语义仍由主 keydown 统一处理，这里不重复消费。
+const shortcutsTrap = createFocusTrap({ container: elements.shortcutsOverlay });
+const settingsTrap = createFocusTrap({ container: elements.settingsOverlay });
+const onboardingTrap = createFocusTrap({ container: elements.onboardingOverlay });
 
 // FR-C3：错误上报器。是否上报取决于用户设置（默认关闭）；
 // 未配置上报端点时只写本地日志，不会因为缺端点而抛错。
@@ -632,6 +712,15 @@ async function handleResetData() {
       rebuildPages();
     }
 
+    if (options.progress) {
+      // 存储层已一并清除统计与最近文件，内存里的副本必须同步，否则界面还在展示旧数字
+      state.readingStats = createStats();
+      state.recentFiles = [];
+      state.session = null;
+      renderStats();
+      renderRecentFiles();
+    }
+
     if (options.bookmarks) {
       await refreshBookmarks();
     }
@@ -687,6 +776,112 @@ function refreshI18nUi() {
   if (settingsOpen) settingsPanel.refreshShortcutList();
   // 折叠分区的「展开/收起」提示由 JS 维护，需在 i18n 重刷后按当前状态回写
   settingsPanel.setCloudExpanded(settingsPanel.isCloudExpanded());
+
+  // v0.7：这几处文案由 JS 拼接，applyI18n 覆盖不到，必须显式重刷
+  renderOnboardingStep();
+  renderConflictBanner();
+  renderSceneState();
+  renderRecentFiles();
+  updateContrastStatus();
+  renderStats();
+}
+
+// ---------- FR-S1 首次引导 ----------
+
+function renderOnboardingStep() {
+  if (!elements.onboardingTitle) {
+    return;
+  }
+  const { step, index, total, isLast } = getStep(state.onboardingStep);
+  state.onboardingStep = index;
+  elements.onboardingProgress.textContent = t("onboardingProgress", { current: index + 1, total });
+  elements.onboardingTitle.textContent = t(step.titleKey);
+  elements.onboardingBody.textContent = t(step.bodyKey);
+  // 最后一步的按钮是「开始阅读」而不是「下一步」——点了就该去读书，不是去第四步
+  elements.onboardingNext.textContent = isLast ? t("onboardingStart") : t("onboardingNext");
+  elements.onboardingSkip.classList.toggle("hidden", isLast);
+}
+
+function openOnboarding() {
+  onboardingOpen = true;
+  state.onboardingStep = 0;
+  renderOnboardingStep();
+  elements.onboardingOverlay.classList.remove("hidden");
+  onboardingTrap.activate();
+}
+
+async function closeOnboarding({ skipped = false } = {}) {
+  onboardingOpen = false;
+  elements.onboardingOverlay.classList.add("hidden");
+  onboardingTrap.deactivate();
+  state.settings = markOnboardingDone(state.settings, { skipped });
+  await saveReaderSettings(state.settings);
+  renderLibrary();
+}
+
+/**
+ * 首次运行的设备自适应默认值。
+ * 只在用户从未调过版式时生效——把老用户精心调好的 26px 字号改回推荐值是最招人烦的行为之一。
+ */
+async function applyFirstRunDefaults() {
+  if (state.settings.settingsTuned) {
+    return;
+  }
+  const coarsePointer = Boolean(globalThis.matchMedia?.("(pointer: coarse)")?.matches);
+  const recommendation = recommendDefaults({
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio || 1,
+    coarsePointer
+  });
+  state.settings = applyRecommendation(state.settings, recommendation, { tuned: false });
+  await saveReaderSettings(state.settings);
+  applySettings();
+}
+
+// ---------- FR-C2 场景模式 ----------
+
+function renderSceneState() {
+  if (!elements.sceneModeGroup) {
+    return;
+  }
+  // 三项全等才算命中，手调过字号后所有按钮熄灭，避免「明明改过却还高亮夜间」
+  const active = detectScene(state.settings);
+  for (const chip of elements.sceneModeGroup.querySelectorAll(".scene-chip")) {
+    chip.setAttribute("aria-pressed", String(chip.dataset.scene === active));
+  }
+}
+
+async function handleSceneChange(sceneId) {
+  if (shouldWarnCustomPalette(state.settings) && !window.confirm(t("sceneCustomPaletteConfirm"))) {
+    return;
+  }
+  const next = applyScene(state.settings, sceneId);
+  // 场景本身就是一套版式，标记为「已调过」以免后续推荐值又把它改掉
+  state.settings = { ...next, settingsTuned: true };
+  applySettings();
+  detectPagesPerView();
+  await saveReaderSettings(state.settings);
+  rebuildPages();
+  renderSceneState();
+}
+
+// ---------- FR-S4 对比度状态 ----------
+
+function updateContrastStatus() {
+  const target = elements.a11yContrastStatus;
+  if (!target) {
+    return;
+  }
+  const audit = auditPalette(captureCurrentPalette());
+  if (audit.passes) {
+    target.textContent = t("a11yContrastOk");
+    target.classList.remove("is-warning");
+    return;
+  }
+  const ratio = Number(audit.worst?.ratio || 0).toFixed(2);
+  target.textContent = `${t("a11yContrastWarn", { count: audit.failures.length })} · ${t("a11yContrastRatio", { ratio })}`;
+  target.classList.add("is-warning");
 }
 
 const GIST_CONFIG_KEY = "gistCloudConfig";
@@ -1089,6 +1284,216 @@ async function refreshRecentReads() {
   }
 }
 
+// ---------- FR-S3 同步冲突 ----------
+
+/**
+ * 在读取设置之前先抓一份两侧快照。
+ *
+ * 顺序很关键：`getReaderSettings` 会把胜出一方写回另一侧，
+ * 一旦先调用它，被覆盖的那一侧就永久丢失，冲突再也无从判定。
+ */
+async function capturePendingConflict() {
+  let snapshot;
+  try {
+    snapshot = await readSettingsSnapshot();
+  } catch {
+    return;
+  }
+  if (!snapshot?.hasSync) {
+    return;
+  }
+  const conflict = detectConflict(snapshot.local, snapshot.remote);
+  if (!conflict) {
+    return;
+  }
+  state.pendingConflict = { conflict, local: snapshot.local, remote: snapshot.remote };
+  renderConflictBanner();
+}
+
+function renderConflictBanner() {
+  const banner = elements.conflictBanner;
+  if (!banner) {
+    return;
+  }
+  const pending = state.pendingConflict;
+  if (!pending) {
+    banner.classList.add("hidden");
+    if (elements.conflictDetail) {
+      elements.conflictDetail.textContent = "";
+    }
+    return;
+  }
+  const summary = summarizeConflict(pending.conflict);
+  const labels = summary.fields.map((field) => t(FIELD_LABEL_KEY[field] || "conflictDetail")).join(" / ");
+  if (elements.conflictDetail) {
+    elements.conflictDetail.textContent = labels ? `${t("conflictDetail")} ${labels}` : t("conflictDetail");
+  }
+  banner.classList.remove("hidden");
+}
+
+async function handleConflictResolve(strategy) {
+  const pending = state.pendingConflict;
+  if (!pending) {
+    return;
+  }
+  // 时间戳由 resolveConflict 保证严格大于两侧，否则下次读取又会判成「对方更新」而回滚
+  const merged = resolveConflict(pending.local, pending.remote, strategy, {
+    now: Date.now(),
+    defaults: getDefaultSettings()
+  });
+  state.pendingConflict = null;
+  renderConflictBanner();
+  state.settings = await saveResolvedSettings(merged);
+  applySettings();
+  detectPagesPerView();
+  rebuildPages();
+  renderSceneState();
+  updateContrastStatus();
+}
+
+// ---------- FR-C1 最近文件 ----------
+
+function renderRecentFiles() {
+  const list = elements.recentFilesList;
+  if (!list) {
+    return;
+  }
+  const items = listRecentFiles(state.recentFiles);
+  list.innerHTML = "";
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "file-meta";
+    empty.textContent = t("readerRecentEmpty");
+    list.append(empty);
+    return;
+  }
+  for (const item of items) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = item.name;
+    if (state.book?.id === item.bookId) {
+      button.classList.add("active");
+    }
+    button.addEventListener("click", async () => {
+      if (item.bookId) {
+        await loadBook(item.bookId);
+      }
+    });
+    list.append(button);
+  }
+}
+
+async function rememberRecentFile(imported) {
+  const entry = toRecentEntry(imported, { bookId: imported?.id || null, importedAt: Date.now() });
+  if (!entry) {
+    return;
+  }
+  state.recentFiles = pushRecentFile(state.recentFiles, entry);
+  await saveRecentFiles(state.recentFiles);
+  renderRecentFiles();
+}
+
+// ---------- FR-S2 阅读统计 ----------
+
+/**
+ * 当前读到全书第几个字符的估算值。
+ *
+ * 精确值需要按页累计 DOM 字符数，代价太高且翻页频繁。
+ * 这里用「已读完章节字数 + 本章按页比例折算」近似——统计用途足够，
+ * 而且同一会话前后两次相减时系统误差会互相抵消。
+ */
+function estimateReadChars() {
+  const chapters = state.book?.chapters || [];
+  if (!chapters.length) {
+    return 0;
+  }
+  let chars = 0;
+  for (let index = 0; index < state.currentChapterIndex; index += 1) {
+    chars += chapters[index]?.content?.length || 0;
+  }
+  const chapterChars = chapters[state.currentChapterIndex]?.content?.length || 0;
+  const chapterPages = Math.max(1, Math.ceil(state.pages.length / Math.max(1, state.pagesPerView)));
+  const readPages = state.currentPageIndex / Math.max(1, state.pagesPerView);
+  return chars + Math.round((readPages / chapterPages) * chapterChars);
+}
+
+/** 任何一次翻页/滚动/跳章都算「还在读」。 */
+function markReadingActivity() {
+  const now = Date.now();
+  if (!state.session) {
+    state.session = { startedAt: now, charsStart: estimateReadChars() };
+  }
+  state.lastActivityAt = now;
+}
+
+async function flushReadingSession() {
+  if (!state.session) {
+    return;
+  }
+  const { startedAt, charsStart } = state.session;
+  // 空闲时间不计入：长时间挂着页面去吃饭，不该算成读了 3 小时
+  const endedAt = Math.min(Date.now(), state.lastActivityAt + IDLE_TIMEOUT_MS);
+  const durationMs = Math.max(0, endedAt - startedAt);
+  const charsRead = Math.max(0, estimateReadChars() - charsStart);
+  state.session = null;
+
+  if (durationMs < MIN_SESSION_MS) {
+    return;
+  }
+
+  state.readingStats = pruneHistory(recordSession(state.readingStats, { startedAt, endedAt, durationMs, charsRead }));
+  await saveReadingStats(state.readingStats);
+  renderStats();
+}
+
+/** 定时检查是否已进入空闲：会话保持连续，不做碎片化切分。 */
+function tickReadingSession() {
+  if (!state.session) {
+    return;
+  }
+  if (Date.now() - state.lastActivityAt >= IDLE_TIMEOUT_MS) {
+    flushReadingSession().catch(() => {});
+  }
+}
+
+function startReadingClock() {
+  window.setInterval(tickReadingSession, 15000);
+  // 切走标签页、关页面都要落盘，否则最后一段阅读会凭空消失
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      flushReadingSession().catch(() => {});
+    }
+  });
+  window.addEventListener("pagehide", () => {
+    flushReadingSession().catch(() => {});
+  });
+}
+
+function formatDurationText(ms) {
+  const { hours, minutes, seconds } = splitDuration(ms);
+  if (hours > 0) {
+    return t("statsDurationHour", { hours, minutes });
+  }
+  if (minutes > 0) {
+    return t("statsDurationMinute", { minutes });
+  }
+  return t("statsDurationSecond", { seconds });
+}
+
+/** 本章还要读多久：按今日速度折算，速度未知时不给瞎猜的数字。 */
+function estimateRemainingText(speed) {
+  const chapters = state.book?.chapters || [];
+  const chapterChars = chapters[state.currentChapterIndex]?.content?.length || 0;
+  if (!chapterChars) {
+    return "—";
+  }
+  const chapterPages = Math.max(1, Math.ceil(state.pages.length / Math.max(1, state.pagesPerView)));
+  const readPages = state.currentPageIndex / Math.max(1, state.pagesPerView);
+  const remainingChars = Math.max(0, Math.round(chapterChars * (1 - readPages / chapterPages)));
+  const ms = estimateRemaining({ remainingChars, speed });
+  return ms ? formatDurationText(ms) : "—";
+}
+
 function renderStats() {
   if (!state.settings.showStats) {
     elements.statsList.innerHTML = "";
@@ -1104,6 +1509,13 @@ function renderStats() {
   const pageProgress = isScrollMode()
     ? elements.pageIndicator.textContent || "0%"
     : `${Math.floor(state.currentPageIndex / Math.max(1, state.pagesPerView)) + 1} / ${Math.max(1, Math.ceil(state.pages.length / Math.max(1, state.pagesPerView)))}`;
+  const reading = summarize(state.readingStats);
+
+  // v0.7 行为统计放最前：用户更关心「今天读了多少、还剩多久」，而不是全书字数
+  stats.push([t("statsToday"), reading.todayMs ? formatDurationText(reading.todayMs) : t("statsEmpty")]);
+  stats.push([t("statsSpeed"), reading.speed ? t("statsSpeedUnit", { value: reading.speed }) : "—"]);
+  stats.push([t("statsRemaining"), estimateRemainingText(reading.speed)]);
+  stats.push([t("statsStreak"), t("statsStreakUnit", { days: reading.streak })]);
 
   stats.push([
     t("readerStatsMode"),
@@ -1134,13 +1546,24 @@ function setShortcutsOverlay(open) {
     renderShortcutHelp();
   }
   elements.shortcutsOverlay.classList.toggle("hidden", !open);
+  elements.shortcutsToggle.setAttribute("aria-expanded", String(open));
+  if (open) {
+    shortcutsTrap.activate();
+  } else {
+    shortcutsTrap.deactivate();
+  }
 }
 
 function setSettingsOverlay(open) {
   settingsOpen = open;
   elements.settingsOverlay?.classList.toggle("hidden", !open);
-  if (!open) return;
+  elements.settingsToggle?.setAttribute("aria-expanded", String(open));
+  if (!open) {
+    settingsTrap.deactivate();
+    return;
+  }
   settingsPanel.prepareOpen();
+  settingsTrap.activate();
 }
 
 function renderLibrary() {
@@ -1334,6 +1757,8 @@ function applySettings() {
   elements.animationIntensity.disabled = disableAnimation;
   updateNavButtonLabels();
   updateImmersiveButton();
+  renderSceneState();
+  updateContrastStatus();
   if (!isScrollMode()) {
     hideModeHint();
   }
@@ -1488,6 +1913,10 @@ function renderSpread() {
   renderStats();
   renderDebugPanel();
   renderReaderState();
+  // 每次翻页/重排都算一次阅读活动，统计会话据此累计时长
+  if (state.book) {
+    markReadingActivity();
+  }
 }
 
 async function persistProgress() {
@@ -1750,6 +2179,35 @@ async function loadBook(bookId) {
  * @param {File} file
  * @param {string|null} encoding 手动指定的编码（FR-M2），为空则自动探测
  */
+/**
+ * 纯导入：解析并落库，成功后返回保存结果；失败抛出。
+ * UI 状态（加载中/错误/编码选择）由调用方负责，批量队列复用这一段，
+ * 避免「单文件导入」与「批量导入」各写一套解析逻辑而逐渐长歪。
+ */
+async function importFileCore(file, encoding = null) {
+  const imported = await readTxtFile(file, encoding ? { encoding } : {});
+
+  // FR-M2：自动探测不可靠时交由上层提示手动选编码，这里用带标记的错误区分于真正的失败
+  if (imported.needsManual) {
+    throw Object.assign(new Error("needs-manual-encoding"), {
+      name: "NeedsManualEncodingError",
+      needsManual: true
+    });
+  }
+
+  if (!imported.text.trim()) {
+    throw Object.assign(new Error("文件内容为空"), { name: "EmptyFileError" });
+  }
+
+  const { chapters, isFallback } = parseChaptersWithMeta(imported.text);
+  const saved = await saveBook({
+    ...imported,
+    chapters
+  });
+
+  return { saved, isFallback };
+}
+
 async function importFile(file, encoding = null) {
   if (!file) {
     return;
@@ -1762,27 +2220,12 @@ async function importFile(file, encoding = null) {
   renderReaderState();
 
   try {
-    const imported = await readTxtFile(file, encoding ? { encoding } : {});
-
-    // FR-M2：自动探测不可靠时进入错误态，由用户手动选编码后重导入
-    if (imported.needsManual) {
-      state.needsEncodingChoice = true;
-      return;
-    }
-
-    if (!imported.text.trim()) {
-      throw Object.assign(new Error("文件内容为空"), { name: "EmptyFileError" });
-    }
-
-    const { chapters, isFallback } = parseChaptersWithMeta(imported.text);
-    const saved = await saveBook({
-      ...imported,
-      chapters
-    });
+    const { saved, isFallback } = await importFileCore(file, encoding);
 
     state.chapterPageCache.clear();
     state.books = await listBooks();
     await loadBook(saved.id);
+    await rememberRecentFile(saved);
 
     // FR-M3：无章节标记的书已按整本平铺，必须明确告诉用户，
     // 否则用户会以为是目录解析坏了。
@@ -1790,6 +2233,10 @@ async function importFile(file, encoding = null) {
       showModeHint(t("readerFlatBookHint"), 3200);
     }
   } catch (error) {
+    if (error?.needsManual) {
+      state.needsEncodingChoice = true;
+      return;
+    }
     state.importError = error;
     console.error("Xyfy.TxtReader 导入失败", error);
     errorReporter.report(error, { phase: "import" });
@@ -1799,9 +2246,147 @@ async function importFile(file, encoding = null) {
   }
 }
 
+/** 批量队列的单文件适配：只取「是否成功」，失败由队列自己收集。 */
+async function importOneForQueue(file) {
+  const { saved } = await importFileCore(file);
+  return saved;
+}
+
+/**
+ * 批量导入：先筛掉不合格的文件并逐条说明原因，再串行导入。
+ * 串行是刻意的——并行解析多个大文件会把主线程打成死结。
+ */
+async function handleBatchImport(files) {
+  const list = Array.from(files || []);
+  if (!list.length) {
+    return;
+  }
+
+  const { accepted, rejected } = classifyDroppedFiles(list);
+
+  if (!accepted.length) {
+    if (rejected.length) {
+      const first = rejected[0];
+      elements.fileMeta.textContent = t(REJECT_MESSAGE_KEY[first.reason] || "importRejectNotTxt", {
+        name: first.name
+      });
+    }
+    return;
+  }
+
+  if (accepted.length === 1 && !rejected.length) {
+    await importFile(accepted[0]);
+    return;
+  }
+
+  const queue = createImportQueue({
+    importOne: importOneForQueue,
+    onProgress: ({ index, total }) => {
+      elements.fileMeta.textContent = t("importBatchProgress", { current: index + 1, total });
+    }
+  });
+  queue.enqueue(accepted);
+
+  const summary = await queue.run();
+  const savedList = summary.results.filter((item) => item.status === "done" && item.result).map((item) => item.result);
+
+  // 每个成功的都要进最近文件，不能只记最后一个——用户导 5 本只看到 1 条会以为其余失败
+  if (savedList.length) {
+    let next = state.recentFiles;
+    for (const saved of savedList) {
+      const entry = toRecentEntry(saved, { bookId: saved?.id || null, importedAt: Date.now() });
+      if (entry) {
+        next = pushRecentFile(next, entry);
+      }
+    }
+    state.recentFiles = next;
+    await saveRecentFiles(next);
+    renderRecentFiles();
+  }
+
+  // 队列里最后一个成功的书最可能是用户想看的
+  const lastSaved = savedList[savedList.length - 1];
+  if (lastSaved) {
+    state.chapterPageCache.clear();
+    state.books = await listBooks();
+    await loadBook(lastSaved.id);
+  }
+
+  // 结果必须落在用户能看见的位置：showModeHint 在书本模式下不显示，等于没有反馈
+  const parts = [];
+  if (summary.failed > 0) {
+    parts.push(t("importBatchPartial", { ok: summary.succeeded, failed: summary.failed }));
+  } else {
+    parts.push(t("importBatchDone", { count: summary.succeeded }));
+  }
+  if (rejected.length) {
+    const first = rejected[0];
+    const reason = t(REJECT_MESSAGE_KEY[first.reason] || "importRejectNotTxt", { name: first.name });
+    parts.push(rejected.length > 1 ? `${reason} +${rejected.length - 1}` : reason);
+  }
+  elements.fileMeta.textContent = parts.join(" · ");
+
+  if (summary.failed > 0) {
+    showModeHint(t("importBatchPartial", { ok: summary.succeeded, failed: summary.failed }), 3400);
+  }
+}
+
 function handleFileSelection(event) {
-  const [file] = event.target.files || [];
-  importFile(file);
+  const files = Array.from(event.target.files || []);
+  if (!files.length) {
+    return;
+  }
+  if (files.length === 1) {
+    importFile(files[0]);
+    return;
+  }
+  handleBatchImport(files);
+}
+
+/** FR-C1：整块阅读区作为拖拽落区，拖入即有实心提示。 */
+function bindDropZone() {
+  const zone = elements.readerShell;
+  if (!zone) {
+    return;
+  }
+  let depth = 0;
+
+  const hasFiles = (event) => Array.from(event.dataTransfer?.types || []).includes("Files");
+
+  zone.addEventListener("dragenter", (event) => {
+    if (!hasFiles(event)) {
+      return;
+    }
+    event.preventDefault();
+    depth += 1;
+    elements.dropHint?.classList.remove("hidden");
+  });
+
+  zone.addEventListener("dragover", (event) => {
+    if (!hasFiles(event)) {
+      return;
+    }
+    // 不 preventDefault 浏览器会直接打开文件，阅读器里的内容全没了
+    event.preventDefault();
+  });
+
+  zone.addEventListener("dragleave", () => {
+    // dragleave 在子元素间移动时也会触发，用计数避免提示层闪烁
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) {
+      elements.dropHint?.classList.add("hidden");
+    }
+  });
+
+  zone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    depth = 0;
+    elements.dropHint?.classList.add("hidden");
+    const files = Array.from(event.dataTransfer?.files || []);
+    if (files.length) {
+      handleBatchImport(files);
+    }
+  });
 }
 
 /** 错误态的「重试」：有上次文件时直接重放，否则重新唤起文件选择 */
@@ -1999,7 +2584,10 @@ async function handleSettingsChange() {
     animationStyle: elements.animationStyle.value,
     animationIntensity: Number(elements.animationIntensity.value),
     showStats: Boolean(elements.showStats?.checked),
-    errorReporting: Boolean(elements.errorReporting?.checked)
+    errorReporting: Boolean(elements.errorReporting?.checked),
+    // 用户亲手改过版式：后续设备自适应推荐不再覆盖，场景高亮也随之熄灭
+    settingsTuned: true,
+    scene: ""
   };
   applySettings();
   if (nextTheme === "custom") {
@@ -2296,6 +2884,8 @@ function bindEvents() {
   elements.resetColors?.addEventListener("click", resetColors);
   elements.resetKeys?.addEventListener("click", () => settingsPanel.resetKeys());
   elements.switchToCustom?.addEventListener("click", async () => {
+    // 切回自定义主题时保留此前调好的配色，而不是让用户从头再调一遍
+    state.settings = restoreCustomPalette(state.settings);
     elements.themeSelect.value = "custom";
     await handleSettingsChange();
   });
@@ -2309,8 +2899,13 @@ function bindEvents() {
       return;
     }
 
-    // Escape 关闭浮层为不可重绑的保护性固定行为
+    // Escape 关闭浮层为不可重绑的保护性固定行为；引导层级最高，先关它
     if (event.key === "Escape") {
+      if (onboardingOpen) {
+        event.preventDefault();
+        closeOnboarding({ skipped: true });
+        return;
+      }
       if (shortcutsOpen) {
         event.preventDefault();
         setShortcutsOverlay(false);
@@ -2324,6 +2919,11 @@ function bindEvents() {
       return;
     }
 
+    // 引导是模态的：打开期间其余快捷键不该穿透到正文，否则用户按空格会翻页却看不见
+    if (onboardingOpen) {
+      return;
+    }
+
     const action = matchKeyBinding(event, state.settings.keybindings);
     if (action) {
       event.preventDefault();
@@ -2331,19 +2931,58 @@ function bindEvents() {
     }
   });
 
+  // FR-C2 场景按钮
+  elements.sceneModeGroup?.querySelectorAll(".scene-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      handleSceneChange(chip.dataset.scene);
+    });
+  });
+
+  // FR-S3 冲突裁决
+  elements.conflictKeepLocal?.addEventListener("click", () => handleConflictResolve("keep-local"));
+  elements.conflictKeepRemote?.addEventListener("click", () => handleConflictResolve("keep-remote"));
+  elements.conflictMerge?.addEventListener("click", () => handleConflictResolve("newest-per-field"));
+
+  // FR-S1 引导
+  elements.onboardingSkip?.addEventListener("click", () => closeOnboarding({ skipped: true }));
+  elements.onboardingNext?.addEventListener("click", async () => {
+    const { index, isLast } = getStep(state.onboardingStep);
+    if (isLast) {
+      await closeOnboarding({ skipped: false });
+      return;
+    }
+    state.onboardingStep = nextStepIndex(index);
+    renderOnboardingStep();
+  });
+
+  // FR-S4 跳到正文：把焦点交给主区域，读屏会从这里继续
+  elements.skipToContent?.addEventListener("click", (event) => {
+    event.preventDefault();
+    elements.readerMain?.focus();
+  });
+
+  // FR-C1 拖拽落区
+  bindDropZone();
 }
 
 async function bootstrap() {
   await initializeI18n();
   refreshI18nUi();
 
+  // 必须在 getReaderSettings 之前：后者会把胜出一方写回另一侧，冲突就再也判不出来了
+  await capturePendingConflict();
+
   state.settings = await getReaderSettings();
   state.books = await listBooks();
+  state.readingStats = (await getReadingStats()) || createStats();
+  state.recentFiles = await getRecentFiles();
   detectPagesPerView();
   applySettings();
   renderLibrary();
   renderBookmarks();
   renderStats();
+  renderRecentFiles();
+  renderSceneState();
   bindEvents();
   await initializeCloudSection();
   await refreshRecentReads();
@@ -2351,6 +2990,14 @@ async function bootstrap() {
   if (state.books[0]) {
     await loadBook(state.books[0].id);
   }
+
+  // 首次引导：先套用设备推荐值，再展示引导，用户第一眼看到的就是适合当前屏幕的版式
+  if (shouldShowOnboarding({ settings: state.settings, bookCount: state.books.length })) {
+    await applyFirstRunDefaults();
+    openOnboarding();
+  }
+
+  startReadingClock();
 }
 
 bootstrap().catch((error) => {

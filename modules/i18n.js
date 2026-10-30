@@ -226,7 +226,84 @@ export const MESSAGES = {
     readerBookmarkLabel: "{chapter} · Page group {page}",
     readerInitFailed: "Initialization failed. Check the console for details.",
     readerUnknownTime: "Unknown time",
-    readerCloudProviderFallback: "Cloud Service"
+    readerCloudProviderFallback: "Cloud Service",
+
+    // v0.7 FR-S1 首次引导
+    onboardingTitle: "Welcome to Xyfy TXT Reader",
+    onboardingSkip: "Skip",
+    onboardingNext: "Next",
+    onboardingStart: "Start reading",
+    onboardingProgress: "Step {current} of {total}",
+    onboardingImportTitle: "Drop in a TXT file",
+    onboardingImportBody:
+      "Pick a local TXT novel, or drag it into the window. Chapters are detected automatically, so you can jump around right away.",
+    onboardingReadTitle: "Read the way you like",
+    onboardingReadBody:
+      "Switch between two-page book mode and single-page scrolling, then tune font size, line height and theme. Day, night and eye-care presets are one click away.",
+    onboardingBackupTitle: "Your progress is saved",
+    onboardingBackupBody:
+      "Reading progress, bookmarks and settings stay on this device. You can also export a JSON backup or sync through your own Gist.",
+
+    // v0.7 FR-S2 阅读统计
+    statsToday: "Today",
+    statsTodayHint: "Reading time today, idle gaps over 2 minutes are excluded",
+    statsSpeed: "Reading speed",
+    statsSpeedUnit: "{value} chars/min",
+    statsRemaining: "Time left in chapter",
+    statsStreak: "Reading streak",
+    statsStreakUnit: "{days} days",
+    statsEmpty: "No reading data yet",
+    statsDurationHour: "{hours} h {minutes} min",
+    statsDurationMinute: "{minutes} min",
+    statsDurationSecond: "{seconds} s",
+
+    // v0.7 FR-C2 场景模式
+    sceneLabel: "Scene",
+    sceneDay: "Day",
+    sceneNight: "Night",
+    sceneEyeCare: "Eye care",
+    sceneCustomPaletteConfirm: "Switching scene will discard your custom colors. Continue?",
+
+    // v0.7 FR-C1 批量导入
+    importDropHint: "Drop TXT files to import",
+    importRecentFiles: "Recently imported",
+    importRejectTitle: "Skipped files",
+    importRejectNotTxt: "{name} is not a TXT file",
+    importRejectEmpty: "{name} is empty",
+    importRejectTooLarge: "{name} is larger than 20 MB",
+    importRejectDuplicate: "{name} is already in this batch",
+    importBatchProgress: "Importing {current} / {total}",
+    importBatchDone: "Imported {count} files",
+    importBatchPartial: "{ok} imported, {failed} failed",
+
+    // v0.7 FR-S3 同步冲突
+    conflictTitle: "Settings changed on another device",
+    conflictDetail: "Both devices changed different settings within 5 minutes.",
+    conflictKeepLocal: "Keep this device",
+    conflictKeepRemote: "Keep cloud",
+    conflictMerge: "Merge both",
+    conflictResolved: "Conflict resolved",
+    fieldTheme: "Theme",
+    fieldThemeColors: "Colors",
+    fieldFontFamily: "Font",
+    fieldCustomFont: "Custom font",
+    fieldFontSize: "Font size",
+    fieldLineHeight: "Line height",
+    fieldReadingMode: "Reading mode",
+    fieldAnimationStyle: "Animation",
+    fieldAnimationIntensity: "Animation intensity",
+    fieldShowStats: "Stats panel",
+    fieldKeybindings: "Shortcuts",
+
+    // v0.7 FR-S4 无障碍
+    a11ySkipToContent: "Skip to content",
+    a11ySection: "Accessibility",
+    a11yContrastOk: "All color pairs meet WCAG AA",
+    a11yContrastWarn: "{count} color pairs below WCAG AA",
+    a11yContrastRatio: "Lowest contrast {ratio}:1",
+    a11yContrastUnknown: "Calculating…",
+    a11yFocusHint: "Press Tab to move focus, Esc to close",
+    a11yPageAnnounce: "Page {page} of {total}"
   },
   zh_CN: {
     extName: "文本阅读器",
@@ -435,7 +512,84 @@ export const MESSAGES = {
     readerBookmarkLabel: "{chapter} · 第 {page} 页组",
     readerInitFailed: "初始化失败，请查看控制台错误。",
     readerUnknownTime: "未知时间",
-    readerCloudProviderFallback: "云服务"
+    readerCloudProviderFallback: "云服务",
+
+    // v0.7 FR-S1 首次引导
+    onboardingTitle: "欢迎使用 Xyfy TXT Reader",
+    onboardingSkip: "跳过",
+    onboardingNext: "下一步",
+    onboardingStart: "开始阅读",
+    onboardingProgress: "第 {current} 步，共 {total} 步",
+    onboardingImportTitle: "把 TXT 拖进来",
+    onboardingImportBody:
+      "选择本地 TXT 小说，或直接拖进窗口。章节会自动识别，导入后即可按目录跳转。",
+    onboardingReadTitle: "按你的习惯阅读",
+    onboardingReadBody:
+      "书本双页与单页滚动随时切换，字号、行高与主题都能调。日间、夜间、护眼三套预设一键可得。",
+    onboardingBackupTitle: "进度会留在本机",
+    onboardingBackupBody:
+      "阅读进度、书签与设置都存在本机。你也可以导出 JSON 备份，或用你自己的 Gist 做云备份。",
+
+    // v0.7 FR-S2 阅读统计
+    statsToday: "今日阅读",
+    statsTodayHint: "今天的阅读时长，超过 2 分钟无操作不计入",
+    statsSpeed: "阅读速度",
+    statsSpeedUnit: "{value} 字/分",
+    statsRemaining: "本章剩余",
+    statsStreak: "连续阅读",
+    statsStreakUnit: "{days} 天",
+    statsEmpty: "暂无阅读数据",
+    statsDurationHour: "{hours} 小时 {minutes} 分",
+    statsDurationMinute: "{minutes} 分钟",
+    statsDurationSecond: "{seconds} 秒",
+
+    // v0.7 FR-C2 场景模式
+    sceneLabel: "场景",
+    sceneDay: "日间",
+    sceneNight: "夜间",
+    sceneEyeCare: "护眼",
+    sceneCustomPaletteConfirm: "切换场景会清空你的自定义配色，继续吗？",
+
+    // v0.7 FR-C1 批量导入
+    importDropHint: "松开即可导入 TXT",
+    importRecentFiles: "最近导入",
+    importRejectTitle: "已跳过文件",
+    importRejectNotTxt: "{name} 不是 TXT 文件",
+    importRejectEmpty: "{name} 是空文件",
+    importRejectTooLarge: "{name} 超过 20 MB",
+    importRejectDuplicate: "{name} 在本批次里重复",
+    importBatchProgress: "正在导入 {current} / {total}",
+    importBatchDone: "已导入 {count} 个文件",
+    importBatchPartial: "{ok} 个成功，{failed} 个失败",
+
+    // v0.7 FR-S3 同步冲突
+    conflictTitle: "另一台设备修改了设置",
+    conflictDetail: "两台设备在 5 分钟内各自改动了不同设置。",
+    conflictKeepLocal: "保留本机",
+    conflictKeepRemote: "保留云端",
+    conflictMerge: "两者合并",
+    conflictResolved: "冲突已解决",
+    fieldTheme: "主题",
+    fieldThemeColors: "配色",
+    fieldFontFamily: "字体",
+    fieldCustomFont: "自定义字体",
+    fieldFontSize: "字号",
+    fieldLineHeight: "行高",
+    fieldReadingMode: "阅读模式",
+    fieldAnimationStyle: "动画",
+    fieldAnimationIntensity: "动画强度",
+    fieldShowStats: "统计面板",
+    fieldKeybindings: "快捷键",
+
+    // v0.7 FR-S4 无障碍
+    a11ySkipToContent: "跳到正文",
+    a11ySection: "无障碍",
+    a11yContrastOk: "所有配色均达 WCAG AA",
+    a11yContrastWarn: "{count} 处配色未达 WCAG AA",
+    a11yContrastRatio: "最低对比度 {ratio}:1",
+    a11yContrastUnknown: "计算中…",
+    a11yFocusHint: "按 Tab 移动焦点，Esc 关闭",
+    a11yPageAnnounce: "第 {page} 页，共 {total} 页"
   }
 };
 

@@ -4,6 +4,9 @@ const SETTINGS_KEY = "reader-settings";
 const SETTINGS_SYNC_KEY = "reader-settings-sync";
 const PROGRESS_SYNC_KEY = "reader-progress-sync";
 const SETTINGS_UPDATED_AT_KEY = "settingsUpdatedAt";
+// v0.7 本地数据：刻意不参与 sync / 云备份，只在单机累积
+const READING_STATS_KEY = "reader-reading-stats";
+const RECENT_FILES_KEY = "reader-recent-files";
 const DEFAULT_SETTINGS = {
   theme: "paper",
   customFont: "",
@@ -25,6 +28,14 @@ const DEFAULT_SETTINGS = {
   showStats: false,
   // FR-C3：匿名错误上报，默认关闭。旧设置升级时由 normalizeStoredSettings 自动补全为 false
   errorReporting: false,
+  // FR-S1：首次引导状态。onboardingDone 一旦为真就不再打扰，跳过与完成同等对待
+  onboardingDone: false,
+  onboardingVersion: 0,
+  onboardingSkipped: false,
+  // 用户是否手动调过版式：为真时设备自适应推荐不再覆盖字号与行高
+  settingsTuned: false,
+  // FR-C2：当前场景模式（day / night / eyeCare），空串表示已手调、不对应任何场景
+  scene: "",
   keybindings: structuredCloneKeybindings()
 };
 
@@ -321,6 +332,91 @@ export async function saveReaderSettings(settings) {
   await mirrorSettingsToSync(nextSettings);
 }
 
+/**
+ * 只读取两侧设置，**不写回任何一侧**。
+ *
+ * 冲突判定必须在写回之前完成：`getReaderSettings` 会把胜出一方同步到另一侧，
+ * 一旦先调用它，被覆盖的那一侧设置就再也拿不回来了。
+ */
+export async function readSettingsSnapshot() {
+  const area = storageArea();
+  if (!area) {
+    return { local: null, remote: null, hasSync: false };
+  }
+
+  const [localResult, syncResult] = await Promise.all([
+    area.get(SETTINGS_KEY),
+    syncArea() ? syncArea().get(SETTINGS_SYNC_KEY) : Promise.resolve({})
+  ]);
+
+  return {
+    local: localResult[SETTINGS_KEY] ? normalizeStoredSettings(localResult[SETTINGS_KEY]) : null,
+    remote: syncResult[SETTINGS_SYNC_KEY] ? normalizeStoredSettings(syncResult[SETTINGS_SYNC_KEY]) : null,
+    hasSync: Boolean(syncArea())
+  };
+}
+
+/**
+ * 冲突裁决后落盘：本地与云端写入同一份结果，避免下次读取又被判成「对方更新」。
+ * 时间戳由调用方（resolveConflict）保证严格大于两侧。
+ */
+export async function saveResolvedSettings(settings) {
+  const area = storageArea();
+  const nextSettings = normalizeStoredSettings(settings, Date.now());
+
+  if (area) {
+    await area.set({
+      [SETTINGS_KEY]: nextSettings
+    });
+  }
+  await mirrorSettingsToSync(nextSettings);
+
+  return nextSettings;
+}
+
+export async function getReadingStats() {
+  const area = storageArea();
+  if (!area) {
+    return null;
+  }
+
+  const result = await area.get(READING_STATS_KEY);
+  return result[READING_STATS_KEY] || null;
+}
+
+export async function saveReadingStats(stats) {
+  const area = storageArea();
+  if (!area) {
+    return;
+  }
+
+  await area.set({
+    [READING_STATS_KEY]: stats
+  });
+}
+
+export async function getRecentFiles() {
+  const area = storageArea();
+  if (!area) {
+    return [];
+  }
+
+  const result = await area.get(RECENT_FILES_KEY);
+  const list = result[RECENT_FILES_KEY];
+  return Array.isArray(list) ? list : [];
+}
+
+export async function saveRecentFiles(files) {
+  const area = storageArea();
+  if (!area) {
+    return;
+  }
+
+  await area.set({
+    [RECENT_FILES_KEY]: Array.isArray(files) ? files : []
+  });
+}
+
 async function clearStore(storeName) {
   await withStore(storeName, "readwrite", async (store) => {
     store.clear();
@@ -361,6 +457,10 @@ export async function resetReaderData(options = {}) {
 
   if (progress) {
     tasks.push(clearStore("progress"));
+    // 统计与最近文件是从阅读行为派生的：清了进度却留着「已读 8 小时」会让人以为没生效
+    if (area) {
+      tasks.push(area.remove([READING_STATS_KEY, RECENT_FILES_KEY]));
+    }
     if (sync) {
       tasks.push(
         sync.remove(PROGRESS_SYNC_KEY)
