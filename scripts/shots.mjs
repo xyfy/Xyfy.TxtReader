@@ -6,13 +6,18 @@
 // 前置：
 //   1. 已 `git clone` 本仓库并位于仓库根目录
 //   2. 安装依赖：npm install playwright   （会一并下载 Playwright 的 Chromium）
-//   3. 准备一本 TXT 作为样张（仓库自带 tests/samples/02-large-utf8.txt 也可）
 //
 // 用法：
-//   node scripts/shots.mjs                                  # 用自带样本
-//   node scripts/shots.mjs --book=/path/to/book.txt         # 指定样张
+//   node scripts/shots.mjs                                  # 不指定 → 自动用 / 生成「虚构样本」
+//   node scripts/shots.mjs --book=/path/to/book.txt         # 指定样张（优先）
 //   node scripts/shots.mjs --out=/path/to/screenshots       # 指定输出目录
 //   xvfb-run -a node scripts/shots.mjs                      # Linux 无显示器时
+//
+// 样张优先级：
+//   1. --book 指定的文件（必须存在，否则报错）
+//   2. 仓库自带 tests/samples/02-large-utf8.txt（若存在）
+//   3. 以上都没有 → 自动生成一本虚构中文书到 tests/samples/fictional-sample.txt
+//      （多章节、原创内容，仅用于截图，不进发布包）
 //
 // 输出：store-assets/screenshots/{01-import,02-double,03-scroll,04-toc,05-settings}.png
 //       均为 1280×800 视口截图，符合商店要求。
@@ -30,19 +35,74 @@ const getArg = (name, def) => {
   return hit ? hit.split('=')[1] : def;
 };
 
-const BOOK = getArg(
-  'book',
-  fs.existsSync(path.join(EXT, 'tests/samples/02-large-utf8.txt'))
-    ? path.join(EXT, 'tests/samples/02-large-utf8.txt')
-    : null
-);
+const SAMPLE = path.join(EXT, 'tests/samples/02-large-utf8.txt');
+const FICTION = path.join(EXT, 'tests/samples/fictional-sample.txt');
+
+// 不指定 --book 时，自动生成一本虚构中文书（多章节、原创内容，仅用于截图）。
+const FICTION_TITLE = '雾港旧事';
+const FICTION_CHAPTERS = [
+  ['第一章 起点', [
+    '雨停的时候，屋檐下的水珠还在滴，一滴一滴敲在青石板上。这些都是很多年前的事了，久到连他自己都开始怀疑是否记错。他把信折好，塞进贴身的衣袋里，像藏起一件会烫手的东西。',
+    '老船夫坐在船尾抽烟，烟丝的味道被水汽压得很低。城门在身后合上，发出一声沉闷的响，像是一段日子的结束。这条街他走过很多次，从没像今天这样觉得它长得走不完。',
+    '她没有回头，只是抬手把斗篷的兜帽往上拉了拉。远处传来更鼓的声音，三更了，城里却还有人没睡。城墙上的火把在风里摇晃，把他的影子拉得很长。',
+  ]],
+  ['第二章 旧城', [
+    '风从缺口灌进来，卷起地上的纸屑，像一群找不到家的蝴蝶。如果这个夜晚能够重来一次，他大概还是会做出同样的选择。',
+    '茶馆里坐着几个熟客，见他进来只是点点头。伙计端来一碗温茶，茶面上浮着两片枯了的桂花。他想起临行前母亲说的话，那时候他只当是唠叨。',
+    '街角的灯笼被雨打湿了一半，光晕晕开在水洼里。他数着脚步，从桥头走到巷口，又从巷口走回桥头，仿佛这样就能把走丢的年月走回来。',
+  ]],
+  ['第三章 渡口', [
+    '船靠岸时，雾还没散。码头上的缆绳湿漉漉地缠在木桩上，像谁随手系下的结。他把包袱往肩上一搭，踩着晃悠悠的跳板走了上去。',
+    '对岸的轮廓在雾里时隐时现，像一幅没干透的画。老船夫说，这趟水路他走了四十年，从没见过今天这样静的早晨。',
+    '他在船头站了很久，看水把天和地连成一片灰白。有些话来不及说，有些路来不及走，到最后都成了渡口边被浪拍碎的回响。',
+  ]],
+  ['第四章 灯下', [
+    '客栈的灯是桐油点的，昏黄里带着一点暖。他摊开那封信，字迹已经被雨水洇开，只剩几个模糊的笔画还能辨认。',
+    '窗外的雨又落下来，打在瓦片上，密密地像是有人在低声说话。他吹了吹灯芯，火苗跳了一下，把影子投到墙上，晃了晃，又稳了。',
+    '那一夜他没怎么睡。半梦半醒之间，他仿佛又看见母亲站在院门口，手里攥着那句没说完的叮嘱，风把她的白发吹得乱蓬蓬的。',
+  ]],
+  ['第五章 归途', [
+    '返程的船比来时慢。雾散了，江面亮得晃眼，远山一层层退到身后，像被谁慢慢卷起的画卷。',
+    '他终于明白，有些地方之所以让人惦记，不是因为风景好，而是因为那里住着还肯等他的人。',
+    '上岸时已是黄昏。炊烟从错落的屋顶升起，混着饭香，软软地裹住了整座小城。他深吸一口气，朝着最亮的那扇窗走去。',
+  ]],
+  ['第六章 尾声', [
+    '很多年后，他偶尔还会想起那个雨停的午后。水珠落在青石板上，一声一声，像是谁在替他把没说出口的话，轻轻念了一遍。',
+    '信早已不在了，可有些句子他记了一辈子。他说不出那算不算遗憾，只知道每当雾起，胸口总会微微地，暖一下。',
+  ]],
+];
+
+function ensureFictionalBook() {
+  if (fs.existsSync(FICTION)) return FICTION;
+  const lines = [FICTION_TITLE, ''];
+  for (const [title, paras] of FICTION_CHAPTERS) {
+    lines.push(title, '');
+    for (const p of paras) lines.push(p, '');
+  }
+  fs.mkdirSync(path.dirname(FICTION), { recursive: true });
+  fs.writeFileSync(FICTION, lines.join('\n'), 'utf8');
+  return FICTION;
+}
+
+// 样张解析：--book > 自带样张 > 自动生成虚构书
+const userBook = getArg('book', null);
+let BOOK;
+if (userBook) {
+  if (!fs.existsSync(userBook)) {
+    console.error(`✗ 指定样张不存在：${userBook}`);
+    process.exit(1);
+  }
+  BOOK = userBook;
+} else if (fs.existsSync(SAMPLE)) {
+  BOOK = SAMPLE;
+} else {
+  BOOK = ensureFictionalBook();
+  console.log('· 未指定样张且仓库无自带样本，已自动生成虚构书：', path.basename(BOOK));
+}
+
 const OUT = getArg('out', path.join(EXT, 'store-assets/screenshots'));
 const PROFILE = path.join(EXT, '.shot-profile'); // 临时用户目录，存放扩展 ID
 
-if (!BOOK || !fs.existsSync(BOOK)) {
-  console.error('✗ 找不到样张 TXT。请用 --book=/path/to/book.txt 指定一本本地 TXT。');
-  process.exit(1);
-}
 fs.mkdirSync(OUT, { recursive: true });
 fs.rmSync(PROFILE, { recursive: true, force: true });
 
