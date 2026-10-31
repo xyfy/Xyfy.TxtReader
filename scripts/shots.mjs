@@ -183,7 +183,9 @@ async function diagShot(page, label) {
   let imported = false;
   try {
     console.log('▶ 导入样张：', path.basename(BOOK));
-    await page.waitForSelector('#file-input', { timeout: 10000 });
+    // #file-input 是隐藏控件（display:none），reader.js 靠它的 change 事件触发导入；
+    // setInputFiles 可直接对其赋值并派发 change，无需可见。故用 state:'attached' 等待即可。
+    await page.waitForSelector('#file-input', { state: 'attached', timeout: 10000 });
     await page.setInputFiles('#file-input', BOOK);
     // 导入完成的可靠标志：左侧页面渲染出正文（empty 类被移除、出现真实内容）
     await page.waitForFunction(() => {
