@@ -5,7 +5,8 @@
 //
 // 前置：
 //   1. 已 `git clone` 本仓库并位于仓库根目录
-//   2. 安装依赖：npm install playwright   （会一并下载 Playwright 的 Chromium）
+//   2. 安装依赖：npm install playwright
+//      再单独下载浏览器二进制（约 150MB，只需一次）：npx playwright install chromium
 //
 // 用法：
 //   node scripts/shots.mjs                                  # 不指定 → 自动用 / 生成「虚构样本」
@@ -121,32 +122,46 @@ function readExtId() {
   return null;
 }
 
+async function diagShot(page, label) {
+  try {
+    const p = path.join(OUT, `diag-${label}.png`);
+    await page.screenshot({ path: p });
+    console.error(`  ↳ 已保存诊断截图：${p}`);
+  } catch { /* 截图失败也继续 */ }
+}
+
 (async () => {
   console.log('▶ 启动 Chromium（加载扩展）…');
-  const context = await chromium.launchPersistentContext(PROFILE, {
-    headless: false, // 扩展必须在有头模式加载
-    // 关键：Playwright 默认带 --disable-extensions，会连我们的 --load-extension 一起禁用。
-    // 必须显式忽略该默认参数，否则扩展子系统根本不初始化（Extensions 目录都不会创建）。
-    ignoreDefaultArgs: ['--disable-extensions'],
-    args: [
-      `--load-extension=${EXT}`,
-      `--disable-extensions-except=${EXT}`,
-      '--no-sandbox',
-      '--disable-dev-shm-usage',
-      '--no-first-run',
-      '--no-default-browser-check',
-    ],
-    viewport: { width: 1280, height: 800 },
-  });
+  let context;
+  try {
+    context = await chromium.launchPersistentContext(PROFILE, {
+      headless: false, // 扩展必须在有头模式加载
+      // 关键：Playwright 默认带 --disable-extensions，会连我们的 --load-extension 一起禁用。
+      // 必须显式忽略该默认参数，否则扩展子系统根本不初始化（Extensions 目录都不会创建）。
+      ignoreDefaultArgs: ['--disable-extensions'],
+      args: [
+        `--load-extension=${EXT}`,
+        `--disable-extensions-except=${EXT}`,
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+        '--no-first-run',
+        '--no-default-browser-check',
+      ],
+      viewport: { width: 1280, height: 800 },
+    });
+  } catch (e) {
+    console.error('✗ 启动浏览器失败：', e.message);
+    process.exit(1);
+  }
 
   // 等待扩展注册（ID 落盘）
   let extId = null;
-  for (let i = 0; i < 20 && !extId; i++) {
+  for (let i = 0; i < 40 && !extId; i++) {
     extId = readExtId();
     if (!extId) await sleep(500);
   }
   if (!extId) {
-    console.error('✗ 扩展未加载。请确认 manifest.json 在仓库根目录，且本机 Chrome 能加载未打包扩展。');
+    console.error('✗ 扩展未加载。请确认：(1) manifest.json 在仓库根目录 (2) 本机 chrome://extensions 开发者模式已开，能手动加载未打包扩展');
     await context.close();
     process.exit(1);
   }
@@ -156,60 +171,104 @@ function readExtId() {
   const page = await context.newPage();
   await page.setViewportSize({ width: 1280, height: 800 });
 
-  // 1) 导入页（空态，含「导入 TXT」入口）
-  console.log('▶ [1/5] 导入页');
-  await page.goto(`${base}/reader/reader.html`);
-  await page.waitForSelector('#state-empty-import', { timeout: 15000 });
-  await sleep(400);
-  await page.screenshot({ path: path.join(OUT, '01-import.png') });
+  const results = [];
+  async function step(name, fn) {
+    try {
+      console.log(`▶ [${name}]`);
+      await fn();
+      results.push(`✓ ${name}`);
+    } catch (e) {
+      results.push(`✗ ${name}: ${e.message}`);
+      await diagShot(page, name.replace(/[^\w]/g, '-'));
+    }
+  }
 
-  // 导入样张
-  console.log('▶ 导入样张：', path.basename(BOOK));
-  await page.setInputFiles('#file-input', BOOK);
-  await page.waitForSelector('#book-title', { timeout: 20000 });
-  await sleep(2000); // 等分页生成
+  // 1) 导入页（阅读器主界面，含侧栏 Import 入口与空态提示）
+  //    注意：不要等 #state-empty-import，它在默认 hidden 的覆盖层里，永远不可见会超时闪退。
+  //    改为等 #reader-main 可见（页面已加载）即可。
+  await step('1/5 导入页', async () => {
+    await page.goto(`${base}/reader/reader.html`, { timeout: 20000 });
+    await page.waitForSelector('#reader-main', { timeout: 15000 });
+    await sleep(600);
+    await page.screenshot({ path: path.join(OUT, '01-import.png') });
+  });
 
-  // 2) 书本双页模式
-  console.log('▶ [2/5] 双页模式');
-  await page.selectOption('#reading-mode', 'book');
-  await sleep(800);
-  await page.waitForFunction(() => {
-    const el = document.querySelector('#left-page');
-    return el && el.textContent.trim().length > 0;
-  }, { timeout: 10000 }).catch(() => {});
-  await page.screenshot({ path: path.join(OUT, '02-double-page.png') });
+  // 导入样张（不计入 5 步，单独处理）
+  let imported = false;
+  try {
+    console.log('▶ 导入样张：', path.basename(BOOK));
+    await page.waitForSelector('#file-input', { timeout: 10000 });
+    await page.setInputFiles('#file-input', BOOK);
+    // 导入完成的可靠标志：左侧页面渲染出正文（empty 类被移除、出现真实内容）
+    await page.waitForFunction(() => {
+      const el = document.querySelector('#left-page');
+      return el && !el.classList.contains('empty') && (el.textContent || '').trim().length > 0;
+    }, { timeout: 25000 });
+    await sleep(2000); // 等分页/目录生成
+    imported = true;
+    results.push('✓ 导入样张');
+  } catch (e) {
+    results.push(`✗ 导入样张: ${e.message}`);
+    await diagShot(page, 'import');
+  }
 
-  // 3) 滚动阅读模式
-  console.log('▶ [3/5] 滚动模式');
-  await page.selectOption('#reading-mode', 'scroll');
-  await sleep(800);
-  await page.screenshot({ path: path.join(OUT, '03-scroll.png') });
+  if (imported) {
+    // 2) 书本双页模式
+    await step('2/5 双页模式', async () => {
+      await page.selectOption('#reading-mode', 'book');
+      await sleep(1000);
+      await page.waitForFunction(() => {
+        const el = document.querySelector('#left-page');
+        return el && !el.classList.contains('empty') && el.textContent.trim().length > 0;
+      }, { timeout: 10000 }).catch(() => {});
+      await page.screenshot({ path: path.join(OUT, '02-double-page.png') });
+    });
 
-  // 4) 章节目录 / 侧栏
-  console.log('▶ [4/5] 章节目录');
-  await page.click('#toggle-panel'); // ☰ 展开侧栏
-  await page.waitForFunction(() => {
-    const el = document.querySelector('#toc-list');
-    return el && el.children.length > 0;
-  }, { timeout: 10000 }).catch(() => {});
-  await sleep(400);
-  await page.screenshot({ path: path.join(OUT, '04-toc.png') });
-  await page.click('#toggle-panel'); // 收起侧栏
+    // 3) 滚动阅读模式
+    await step('3/5 滚动模式', async () => {
+      await page.selectOption('#reading-mode', 'scroll');
+      await sleep(1000);
+      await page.screenshot({ path: path.join(OUT, '03-scroll.png') });
+    });
 
-  // 5) 设置面板
-  console.log('▶ [5/5] 设置面板');
-  await page.click('#settings-toggle');
-  await page.waitForSelector('#settings-overlay:not(.hidden)', { timeout: 10000 }).catch(() => {});
-  await sleep(500);
-  await page.screenshot({ path: path.join(OUT, '05-settings.png') });
+    // 4) 章节目录 / 侧栏
+    await step('4/5 章节目录', async () => {
+      await page.click('#toggle-panel'); // ☰ 展开侧栏
+      await sleep(500);
+      await page.waitForFunction(() => {
+        const el = document.querySelector('#toc-list');
+        return el && el.children.length > 0;
+      }, { timeout: 10000 }).catch(() => {});
+      await sleep(400);
+      await page.screenshot({ path: path.join(OUT, '04-toc.png') });
+      await page.click('#toggle-panel').catch(() => {}); // 收起侧栏
+    });
+
+    // 5) 设置面板
+    await step('5/5 设置面板', async () => {
+      await page.click('#settings-toggle');
+      await page.waitForSelector('#settings-overlay:not(.hidden)', { timeout: 10000 }).catch(() => {});
+      await sleep(500);
+      await page.screenshot({ path: path.join(OUT, '05-settings.png') });
+    });
+  } else {
+    console.error('⚠ 样张未成功导入，跳过 2–5 步。请查看 diag-import.png 与上方报错。');
+  }
+
+  // 汇总
+  console.log('\n=== 结果汇总 ===');
+  for (const r of results) console.log('  ' + r);
+  console.log(`\n截图目录：${OUT}`);
+  try {
+    for (const f of ['01-import', '02-double-page', '03-scroll', '04-toc', '05-settings']) {
+      const p = path.join(OUT, `${f}.png`);
+      if (fs.existsSync(p)) console.log(`  - ${f}.png  (${fs.statSync(p).size} B)`);
+    }
+  } catch { /* ignore */ }
 
   await context.close();
-  console.log(`\n✓ 完成！5 张截图已生成在：${OUT}`);
-  for (const f of ['01-import', '02-double-page', '03-scroll', '04-toc', '05-settings']) {
-    const p = path.join(OUT, `${f}.png`);
-    console.log(`  - ${f}.png  (${fs.statSync(p).size} B)`);
-  }
-})().catch((e) => {
+})().catch(async (e) => {
   console.error('✗ 运行失败：', e.message);
+  console.error(e.stack);
   process.exit(1);
 });
