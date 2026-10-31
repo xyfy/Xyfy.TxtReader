@@ -5,25 +5,22 @@
 
 ## 关于本文里的命令路径（先读这段）
 
-本文所有命令使用**相对路径**，起点是仓库根目录。仓库在你本机的实际位置是：
-
-```
-/workspace/Xyfy.TxtReader
-```
-
-所以下面两种写法等价，任选一种：
+**仓库在你本机的路径因人而异，本文不假设具体位置。** 下面所有命令都以「已 `cd` 到仓库根目录」为前提。请先确认你在仓库里：
 
 ```bash
-# 写法 A：绝对路径，任何当前位置都能跑
-cd /workspace/Xyfy.TxtReader && sha256sum dist/xyfy-txt-reader-v1.0.0.zip
+cd <你的仓库路径>              # 换成你自己的，例如：
+                              #   macOS:   cd /Volumes/backup/source/txtReader
+                              #   Windows: cd D:\Projects\Xyfy.TxtReader
+                              #   Linux:   cd ~/Projects/Xyfy.TxtReader
 
-# 写法 B：先回到工作区，再用相对路径（与本文命令一致）
-cd /workspace
-cd Xyfy.TxtReader
-sha256sum dist/xyfy-txt-reader-v1.0.0.zip
+pwd                            # 打印当前目录，确认已进入
+ls manifest.json               # 能看到这个文件就说明位置对了
+git rev-parse --show-toplevel  # 最可靠：直接打印仓库根目录
 ```
 
-> 如果你在 `Xyfy.TxtReader` 目录里直接执行 `cd Xyfy.TxtReader`，会报 `No such file or directory`——因为仓库目录里没有同名子目录。这是最常见的踩坑点。
+> **注意目录名不固定**：本文用 `Xyfy.TxtReader` 举例，但你的本地目录可能叫 `txtReader`（全小写）或别的名字——那是你 `git clone` 时决定的。**不要照抄本文的目录名**，用 `pwd` / `git rev-parse` 确认你自己的实际路径。
+
+至于我（AI）执行命令时用的 `/workspace/Xyfy.TxtReader`——那是我沙箱虚拟机里的路径，**你的电脑上不存在，不要照抄**。
 
 ---
 
@@ -41,6 +38,53 @@ sha256sum dist/xyfy-txt-reader-v1.0.0.zip
 
 ## 第 1 步：核对待发布包（5 分钟）
 
+### 1.0 先取得发布包——`dist/` 不在 Git 仓库里
+
+**这是最容易卡住的一步。** `dist/` 被写在 `.gitignore` 第 2 行，**从来没有入过库**。所以无论 `git clone` 还是 `git pull`，都不会带下任何 ZIP 包。你本地的 `dist/` 目录可能存在，但里面只有你过去本地打的旧包，不会有 `v1.0.0.zip`。
+
+自检：
+
+```bash
+cd <你的仓库路径>
+cat .gitignore | head -3          # 应看到 dist/
+ls -l dist/                        # v1.0.0.zip 大概率不存在
+git ls-files dist/                 # 输出为空，证明 dist 未被跟踪
+```
+
+**取得发布包有两条路，务必选 A：**
+
+#### 路线 A（推荐）：从 GitHub Release 下载
+
+这样拿到的包与手册记录的哈希、与商店将审核的包**逐字节一致**。
+
+```bash
+# 方式 1：用 gh（已登录 GitHub 时最省事）
+gh release download v1.0.0 --pattern '*.zip' --dir dist
+
+# 方式 2：用 curl（无需 gh）
+mkdir -p dist && cd dist
+curl -L -O https://github.com/xyfy/Xyfy.TxtReader/releases/download/v1.0.0/xyfy-txt-reader-v1.0.0.zip
+```
+
+#### 路线 B（仅调试用）：本地重新打包
+
+```bash
+npm install          # 首次需要
+npm run build:zip
+```
+
+> **注意**：`zip` 会把当前文件时间戳写进归档，因此**重新打包的 ZIP 哈希必然与 Release 附件不同**。这个包可以本地加载测试，但**不要拿去提审**——商店里的版本、回滚预案记录的指纹、Release 附件三者必须一致。要走路线 B，就得把新哈希同步更新到 `docs/rollback-runbook.md` 并替换 Release 附件。
+
+#### macOS 用户注意
+
+macOS 默认**没有 `sha256sum`**（那是 GNU coreutils 的命令）。用系统自带的：
+
+```bash
+shasum -a 256 dist/xyfy-txt-reader-v1.0.0.zip
+```
+
+若已通过 Homebrew 安装 `coreutils`，也可以用 `sha256sum`（有时需写 `gsha256sum` 全名）。
+
 ### 1.1 包指纹
 
 | 项 | 值 |
@@ -53,13 +97,13 @@ sha256sum dist/xyfy-txt-reader-v1.0.0.zip
 
 ### 1.2 本地自检命令
 
-**在仓库根目录执行**（`/workspace/Xyfy.TxtReader`，先 `cd /workspace/Xyfy.TxtReader` 一次即可）：
+**在仓库根目录执行**（先 `cd` 到你自己仓库，用 `pwd` 确认位置）：
 
 ```bash
-# 进入仓库根目录（绝对路径，避免相对路径踩坑）
-cd /workspace/Xyfy.TxtReader
+# 0) 确认已在仓库根目录
+ls manifest.json && git rev-parse --show-toplevel
 
-# 1) 哈希是否与手册一致
+# 1) 哈希是否与手册一致（macOS 用 shasum -a 256）
 sha256sum dist/xyfy-txt-reader-v1.0.0.zip
 
 # 2) manifest 版本是否为 1.0.0
@@ -82,7 +126,7 @@ unzip -l dist/xyfy-txt-reader-v1.0.0.zip | grep -E 'tests/|docs/|node_modules|\.
 
 ```bash
 npm test && npm run lint && npm run build:zip
-sha256sum dist/xyfy-txt-reader-v1.0.0.zip   # 记录新哈希
+shasum -a 256 dist/xyfy-txt-reader-v1.0.0.zip   # macOS；Linux 用 sha256sum
 # 然后必须同步更新 docs/rollback-runbook.md 第一节的 SHA-256，并替换 Release 附件
 ```
 
@@ -167,6 +211,42 @@ Xyfy.TxtReader/store-assets/
 - 无障碍：三套预设主题对比度全部达到 WCAG AA（paper 4.77 / night 6.09 / sepia 4.82）
 - 完整变更见 https://github.com/xyfy/Xyfy.TxtReader/blob/main/CHANGELOG.md
 ```
+
+---
+
+## 2.5 一键自动化截图（推荐，省去手动拍）
+
+> 由于 CI/沙箱环境普遍禁止 Chromium 加载扩展，**截图脚本必须在你本机运行**（你本机 Chrome 能正常加载未打包扩展）。我已把脚本写好并验证过语法与 DOM 选择器，你只需三步即可自动产出全部 5 张图。
+
+脚本：`scripts/shots.mjs`（已接入 `npm run shots`）。
+
+```bash
+# 1) 安装依赖（仅首次，会下载 Playwright 的 Chromium）
+npm install playwright
+
+# 2) 自动导入样张并截图（默认使用仓库自带样本 tests/samples/02-large-utf8.txt）
+npm run shots
+# 或指定你自己的样张：
+# node scripts/shots.mjs --book=/path/to/your-book.txt
+
+# 3) 取图
+ls store-assets/screenshots/
+# 01-import.png 02-double-page.png 03-scroll.png 04-toc.png 05-settings.png
+```
+
+| 项 | 值 |
+|----|----|
+| 输出目录 | `store-assets/screenshots/`（已在 `build:zip` 排除列表，不会污染发布包） |
+| 截图规格 | 1280×800 视口截图，PNG，与第 2.2 节 5 张定义一一对应 |
+| 5 张对应 | ①导入页 → `01-import`　②双页 → `02-double-page`　③滚动 → `03-scroll`　④目录 → `04-toc`　⑤设置 → `05-settings` |
+
+**注意事项**：
+- 脚本用本机真实 Chrome 加载扩展并自动点击导入、切换双页/滚动、展开目录、打开设置面板。前提是你能成功加载未打包扩展（chrome 地址栏输入 `chrome://extensions` → 右上角开发者模式 → 加载已解压的扩展程序）。脚本内部走的正是同一逻辑，能加载就能截。
+- macOS / Windows 直接在桌面环境运行即可；**Linux 无图形界面**时，用 `xvfb-run -a npm run shots` 提供虚拟显示器。
+- 截图中正文是虚构测试样本（`gen:samples` 生成），不含任何真实版权内容，可直接上架。
+- 若想换截图里的书，传 `--book` 指一本本地 TXT 即可。
+
+**手动拍摄仍可行**：若你不想装 Playwright，按 2.2 节的拍摄要点与防驳回技巧，用 `chrome://extensions` 加载扩展后手动截 5 张，效果一致。
 
 ---
 
@@ -302,13 +382,11 @@ npm run lint # 期望：0 error（8 个 warning 为历史遗留，与 v0.8.1 持
 
 ## 附录 A：截图清单在哪、本地能不能打开
 
-**位置**：`Xyfy.TxtReader/docs/store-listing.md` → 第 **164** 行 `### 三、商店截图`
-（绝对路径：`/workspace/Xyfy.TxtReader/docs/store-listing.md`）
+**位置**：`docs/store-listing.md` → 第 **164** 行 `### 三、商店截图`
 
-本地可以直接看：
+本地可以直接看（在你自己仓库根目录执行）：
 
 ```bash
-cd /workspace/Xyfy.TxtReader
 sed -n '160,200p' docs/store-listing.md     # 截图 + 宣传图 + 文案勾选清单
 less docs/store-listing.md                  # 全文看
 ```
@@ -332,8 +410,9 @@ less docs/store-listing.md                  # 全文看
 
 | 事项 | 值 |
 |------|-----|
+| **取得发布包** | `gh release download v1.0.0 --pattern '*.zip' --dir dist`（`dist/` 不入库，clone 下来没有包） |
 | 待上传包 | `dist/xyfy-txt-reader-v1.0.0.zip`（151 445 B） |
-| SHA-256 | `b61586bf6200b71405201b11cbfa28d466c7ffb146532cee07f538eb9bd8b167` |
+| SHA-256 | `b61586bf6200b71405201b11cbfa28d466c7ffb146532cee07f538eb9bd8b167`（macOS 校验用 `shasum -a 256`） |
 | 版本号 | `1.0.0`（manifest / package.json / app-info.js 三处一致） |
 | 图标 | `icons/icon128.png` |
 | 文案 | `docs/store-listing.md` |
@@ -347,11 +426,12 @@ less docs/store-listing.md                  # 全文看
 
 ## 附录 C：先把流程走通的建议顺序
 
-1. **今天**：`chrome://extensions` 加载已解压扩展，导入样本，按 2.2 拍 5 张截图（约 1 小时）。
-2. **今天**：按 3.1 在自己浏览器点一次隐私政策链接，确认能打开。
-3. **今天**：按 3.2 把隐私表单答案先写在纸上，别到后台现编。
-4. **明天**：提 Edge（免费、快），1–3 天出结果，先验证包本身没问题。
-5. **Edge 过审后**：提 Chrome（$5 注册费，1–7 天）。
-6. **双端上线后**：启动 `rqZ6YU` 的 7 天观察，宣传图有空再补。
+1. **第一步（别跳过）**：`gh release download v1.0.0 --pattern '*.zip' --dir dist`，然后 `shasum -a 256 dist/xyfy-txt-reader-v1.0.0.zip` 核对是否为 `b61586bf…9bd8b167`。**`dist/` 不在 Git 里，不下载就没有可上传的包。**
+2. **今天**：`chrome://extensions` 加载已解压扩展，导入样本，按 2.2 拍 5 张截图（约 1 小时）。
+3. **今天**：按 3.1 在自己浏览器点一次隐私政策链接，确认能打开。
+4. **今天**：按 3.2 把隐私表单答案先写在纸上，别到后台现编。
+5. **明天**：提 Edge（免费、快），1–3 天出结果，先验证包本身没问题。
+6. **Edge 过审后**：提 Chrome（$5 注册费，1–7 天）。
+7. **双端上线后**：启动 `rqZ6YU` 的 7 天观察，宣传图有空再补。
 
-> 整个卡点只有一件事：**5 张截图**。其余全部就绪。
+> 真正的卡点只有两件事：**先下载到正确的包** + **5 张截图**。其余全部就绪。
