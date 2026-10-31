@@ -5,7 +5,7 @@ Chrome 和 Edge 可用的 TXT 小说阅读扩展，面向本地小说阅读场�
 ## 插件信息
 
 - 名称：Xyfy TXT Reader
-- 版本：0.8.1
+- 版本：1.0.0
 - 形态：Manifest V3 扩展
 - 平台：Chrome / Edge
 - 数据策略：正文保存在 IndexedDB，轻量设置与进度可镜像到 `chrome.storage.sync`
