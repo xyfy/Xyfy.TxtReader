@@ -236,6 +236,13 @@
                 <span data-i18n="readerErrorReporting">匿名错误上报（默认关闭）</span>
               </label>
               <p class="settings-hint" data-i18n="readerErrorReportingHint">开启后仅上报版本、平台与匿名错误栈，不含正文、Gist Token 或任何个人信息。</p>
+              <!-- v0.8 L-02：sync 配额守卫结果，用户必须能看到「未同步」及原因 -->
+              <div id="sync-status-row" class="sync-status-row">
+                <span class="panel-label" data-i18n="syncStateLabel">同步状态</span>
+                <span id="sync-status-badge" class="sync-status-badge" aria-live="polite" role="status">—</span>
+                <span id="sync-usage" class="file-meta sync-usage"></span>
+              </div>
+              <p id="sync-status-detail" class="settings-hint sync-status-detail" aria-live="polite"></p>
             </section>
             <section id="settings-backup" class="settings-section">
               <div class="section-head">

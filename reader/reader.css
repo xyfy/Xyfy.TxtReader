@@ -1427,6 +1427,49 @@ body[data-theme="night"] :focus-visible {
   color: #b5442a;
 }
 
+/* v0.8 L-02：同步状态行。三态用颜色区分，失败态必须醒目但不能只靠颜色传达 */
+.sync-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sync-status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color, #d6cbb6);
+  color: var(--muted-color, #75604a);
+}
+
+.sync-status-badge.is-ok {
+  color: #2f6b3a;
+  border-color: #9cc3a4;
+}
+
+.sync-status-badge.is-degraded {
+  color: #8a5a12;
+  border-color: #d8b878;
+}
+
+.sync-status-badge.is-failed {
+  color: #b5442a;
+  border-color: #d9a08f;
+  font-weight: 600;
+}
+
+.sync-usage {
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-status-detail.is-warning {
+  color: #b5442a;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skip-link,
   .scene-chip {

@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.8.0 - 2026-10-31
+
+> 本版为 v0.7 的验收收尾：把「有条件准出」转为「无条件准出」，为 1.0 能力冻结扫清障碍。
+> 详细验收记录见 GitHub 项目「Xyfy.TxtReader v0.8 验收收尾与缺陷修复」。
+
+### Added
+- **sync 配额守卫**（处置 L-02）：新增 `modules/sync-quota.js`。此前 `mirrorSettingsToSync` / `mirrorProgressToSync` 直接 `area.set`，`chrome.storage.sync` 超配额时抛错且无人捕获，结果是**静默丢配置**（源码检索 `QUOTA_BYTES` 命中 0）。现在写入前按 UTF-8 字节预估体积，分三级处理：① 未超限 → 正常写入；② 超限但可精简 → 摘掉可再生成的字段（自定义配色 / 快捷键 / 自定义字体）后写入，标记「已同步（精简模式）」并列出哪些留在本机；③ 精简后仍超限 → 明确标记「未同步」并给出具体原因，本地存储不受影响。
+- 设置面板「通用」分区新增同步状态行：状态徽章（已同步 / 已同步（精简模式）/ 未同步）+ 已用容量 + 具体原因，`aria-live="polite" role="status"` 可被读屏播报。
+- 新增测试组 `tests/sync-quota.test.mjs`（TC-Q1-01~03）：UTF-8 体积估算（含中文与循环引用）、单条/总量/边界值判定、降级顺序与三态文案、状态台账不可污染。
+- 回归新增 TC-REG-07：断言 `storage.js` 不存在绕过守卫的裸 sync 写入，进度同步必在 `area.set` 前预检，失败必记账。
+
+### Changed
+- `modules/storage.js` 新增 `getSyncStatus()`；`mirrorSettingsToSync` 改为内部走 `writeSettingsToSync`，`mirrorProgressToSync` 增加预检；`resetReaderData` 的 sync 写入由 `Promise.all` 并行改为串行并经同一守卫。
+- i18n 新增 11 个文案键（中英各 276 键），覆盖同步状态三态与降级字段说明。
+- 站点版无 `chrome.storage.sync`，同步状态恒为「已同步」且用量为 0；扩展端才展示真实配额。
+
+### Fixed
+- 同步写入超限静默失败（L-02）。
+- 降级说明在中英混排时用错分隔符（中文界面出现英文分号）。
+
 ## v0.7.0 - 2026-10-30
 
 > 对应 `docs/v0.7-prd.md` 与 `docs/v0.7-test-plan.md`。
