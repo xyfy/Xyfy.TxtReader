@@ -69,7 +69,11 @@ async function snap(page, name) {
 }
 
 async function finish(context) {
-  try { await context.close(); } catch {}
+  try {
+    await context.close();
+  } catch {
+    /* 关闭失败忽略 */
+  }
   fs.rmSync(PROFILE, { recursive: true, force: true });
 }
 
