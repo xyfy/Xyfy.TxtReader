@@ -221,8 +221,9 @@ Xyfy.TxtReader/store-assets/
 脚本：`scripts/shots.mjs`（已接入 `npm run shots`）。
 
 ```bash
-# 1) 安装依赖（仅首次，会下载 Playwright 的 Chromium）
+# 1) 安装依赖（仅首次）
 npm install playwright
+npx playwright install chromium   # 下载 Playwright 的 Chromium 二进制（约 150MB，只需一次）
 
 # 2) 自动导入样张并截图
 #    不指定 --book 时：优先用 tests/samples/02-large-utf8.txt；
@@ -249,6 +250,7 @@ ls store-assets/screenshots/
 - 截图中正文是虚构文本（仓库样本或自动生成的《雾港旧事》均为原创内容），不含任何真实版权内容，可直接上架。
 - 若想换截图里的书，传 `--book` 指一本本地 TXT 即可。
 - 自动生成的 `tests/samples/fictional-sample.txt` 不会被提交（已在 `.gitignore` 的 `tests/samples/` 内），仅本地使用、可随时删除重生成。
+- 若启动时报 `Executable doesn't exist at .../ms-playwright/chromium-*/...`：说明没下载浏览器二进制，先跑 `npx playwright install chromium`，再 `npm run shots`。`npm install playwright` 只装 npm 包，不保证拉浏览器。
 
 **手动拍摄仍可行**：若你不想装 Playwright，按 2.2 节的拍摄要点与防驳回技巧，用 `chrome://extensions` 加载扩展后手动截 5 张，效果一致。
 
