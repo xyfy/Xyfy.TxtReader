@@ -273,6 +273,34 @@ function run() {
     console.log(`✓ TC-REG-06 v0.7 六个功能均已接线（场景/引导/拖拽/冲突/无障碍），非空壳`);
   }
 
+  // ---------- TC-REG-07 v0.8 L-02：sync 写入必须经配额守卫 ----------
+  // 只断言模块存在不算数：必须确认 storage.js 里没有任何绕过守卫的裸 sync.set。
+  {
+    const storageSource = readFileSync(join(projectRoot, "modules/storage.js"), "utf8");
+    assert.match(storageSource, /from "\.\/sync-quota\.js"/, "storage.js 未引入 sync-quota 模块");
+    for (const fn of ["checkSyncQuota", "shrinkSettingsForSync", "createSyncStatusLedger"]) {
+      assert.match(storageSource, new RegExp(`\\b${fn}\\s*\\(`), `storage.js 未调用 ${fn}`);
+    }
+    assert.match(storageSource, /export function getSyncStatus/, "storage.js 未导出 getSyncStatus，设置面板无法展示同步状态");
+
+    // 关键：不允许出现 `area.set({ [SETTINGS_SYNC_KEY]...` 这类绕过守卫的直写
+    assert.doesNotMatch(
+      storageSource,
+      /await\s+area\.set\(\s*\{\s*\[SETTINGS_SYNC_KEY\]/,
+      "storage.js 仍存在绕过配额守卫的裸 sync 写入（SETTINGS_SYNC_KEY）"
+    );
+    // 进度同步同理：必须在 area.set 之前先过 checkSyncQuota
+    const progressBlock = /async function mirrorProgressToSync[\s\S]*?^}/m.exec(storageSource)?.[0] || "";
+    assert.ok(progressBlock.length > 0, "未找到 mirrorProgressToSync");
+    const checkIdx = progressBlock.indexOf("checkSyncQuota");
+    const setIdx = progressBlock.indexOf("area.set");
+    assert.ok(checkIdx > -1 && setIdx > -1 && checkIdx < setIdx, "进度同步未在写入前做配额预检");
+
+    // 失败必须留痕，不能静默
+    assert.match(storageSource, /recordSyncFailure/, "缺少失败记账，超限会静默丢配置");
+    console.log("✓ TC-REG-07 sync 写入全部经配额守卫，无绕过路径，失败有记账");
+  }
+
   // ---------- 版本号一致性：发版最容易漏掉的就是某处没跟着改 ----------
   const pkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf8"));
   const manifest = JSON.parse(readFileSync(join(projectRoot, "manifest.json"), "utf8"));

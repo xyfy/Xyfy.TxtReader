@@ -1,4 +1,10 @@
 import { DEFAULT_KEYBINDINGS } from "./keyboard-map.js";
+import {
+  QUOTA_BYTES,
+  checkSyncQuota,
+  createSyncStatusLedger,
+  shrinkSettingsForSync
+} from "./sync-quota.js";
 
 const SETTINGS_KEY = "reader-settings";
 const SETTINGS_SYNC_KEY = "reader-settings-sync";
@@ -263,9 +269,90 @@ async function mirrorSettingsToSync(settings) {
     return;
   }
 
-  await area.set({
-    [SETTINGS_SYNC_KEY]: settings
+  await writeSettingsToSync(area, SETTINGS_SYNC_KEY, settings);
+}
+
+/**
+ * 带配额守卫的 sync 写入（v0.8 · 处置 L-02）。
+ *
+ * 原实现直接 `area.set`，超配额时抛错且无人捕获 → 静默丢配置。
+ * 现在流程是：预检 → 能压就压 → 压完还超就明确告知并跳过，
+ * 任何分支都把结果记进台账，供设置面板展示「未同步 / 已精简同步」。
+ */
+async function writeSettingsToSync(area, key, settings) {
+  const existing = await safeSyncGet(area);
+  const existingBytes = existing.bytes;
+
+  let payload = settings;
+  let check = checkSyncQuota({ [key]: payload }, { existingBytes });
+
+  if (!check.ok) {
+    // 先尝试精简：丢掉可再生成的字段（配色 / 键位 / 自定义字体）
+    const shrunk = shrinkSettingsForSync(settings, { key, totalLimit: QUOTA_BYTES });
+    if (shrunk.ok) {
+      payload = shrunk.settings;
+      check = checkSyncQuota({ [key]: payload }, { existingBytes });
+      try {
+        await area.set({ [key]: payload });
+        syncStatus.recordOk({
+          droppedFields: shrunk.droppedFields,
+          totalBytes: check.totalBytes,
+          limitBytes: QUOTA_BYTES
+        });
+        return { ok: true, degraded: true, droppedFields: shrunk.droppedFields, check };
+      } catch (error) {
+        return recordSyncFailure(error, check);
+      }
+    }
+
+    // 精简后仍超限：绝不静默，记失败并放弃本次同步（本地存储不受影响）
+    syncStatus.recordFailure({
+      code: check.code,
+      message: check.message,
+      totalBytes: check.totalBytes,
+      limitBytes: QUOTA_BYTES
+    });
+    return { ok: false, degraded: false, droppedFields: [], check };
+  }
+
+  try {
+    await area.set({ [key]: payload });
+    syncStatus.recordOk({ totalBytes: check.totalBytes, limitBytes: QUOTA_BYTES });
+    return { ok: true, degraded: false, droppedFields: [], check };
+  } catch (error) {
+    return recordSyncFailure(error, check);
+  }
+}
+
+/** 读 sync 现有占用；读不到就按 0 处理，不因统计失败阻断主流程 */
+async function safeSyncGet(area) {
+  try {
+    const all = await area.get(null);
+    const bytes = Object.entries(all || {}).reduce((sum, [key, value]) => {
+      const size = checkSyncQuota({ [key]: value }, { totalLimit: Number.MAX_SAFE_INTEGER });
+      return sum + (size.items[0]?.bytes || 0);
+    }, 0);
+    return { bytes, all: all || {} };
+  } catch {
+    return { bytes: 0, all: {} };
+  }
+}
+
+/**
+ * 运行期真实抛错（如并发写入触发的 MAX_WRITE_OPERATIONS）也要记账。
+ * Chrome 的配额错误 message 形如 "QUOTA_BYTES quota exceeded"。
+ */
+function recordSyncFailure(error, check) {
+  const raw = String(error?.message || error || "");
+  const isItemQuota = /QUOTA_BYTES_PER_ITEM|per.?item/i.test(raw);
+  const code = isItemQuota ? "ITEM_TOO_LARGE" : /QUOTA/i.test(raw) ? "TOTAL_TOO_LARGE" : "WRITE_FAILED";
+  syncStatus.recordFailure({
+    code,
+    message: raw || "写入浏览器同步存储失败",
+    totalBytes: check?.totalBytes || 0,
+    limitBytes: QUOTA_BYTES
   });
+  return { ok: false, degraded: false, droppedFields: [], check, error };
 }
 
 async function mirrorProgressToSync(progress) {
@@ -284,9 +371,33 @@ async function mirrorProgressToSync(progress) {
     }
   };
 
-  await area.set({
-    [PROGRESS_SYNC_KEY]: next
-  });
+  // 进度记录会随书数增长，同样受单条 8KB 限制，必须预检
+  const check = checkSyncQuota({ [PROGRESS_SYNC_KEY]: next });
+  if (!check.ok) {
+    syncStatus.recordFailure({
+      code: check.code,
+      message: check.message,
+      totalBytes: check.totalBytes,
+      limitBytes: QUOTA_BYTES
+    });
+    return;
+  }
+
+  try {
+    await area.set({
+      [PROGRESS_SYNC_KEY]: next
+    });
+    syncStatus.recordOk({ totalBytes: check.totalBytes, limitBytes: QUOTA_BYTES });
+  } catch (error) {
+    recordSyncFailure(error, check);
+  }
+}
+
+/** 同步状态台账：供设置面板读取「已同步 / 已精简 / 未同步及原因」 */
+const syncStatus = createSyncStatusLedger();
+
+export function getSyncStatus() {
+  return syncStatus.get();
 }
 
 export function getDefaultSettings() {
@@ -446,13 +557,6 @@ export async function resetReaderData(options = {}) {
         [SETTINGS_KEY]: defaultSettings
       })
     );
-    if (sync) {
-      tasks.push(
-        sync.set({
-          [SETTINGS_SYNC_KEY]: defaultSettings
-        })
-      );
-    }
   }
 
   if (progress) {
@@ -460,11 +564,6 @@ export async function resetReaderData(options = {}) {
     // 统计与最近文件是从阅读行为派生的：清了进度却留着「已读 8 小时」会让人以为没生效
     if (area) {
       tasks.push(area.remove([READING_STATS_KEY, RECENT_FILES_KEY]));
-    }
-    if (sync) {
-      tasks.push(
-        sync.remove(PROGRESS_SYNC_KEY)
-      );
     }
   }
 
@@ -477,6 +576,20 @@ export async function resetReaderData(options = {}) {
   }
 
   await Promise.all(tasks);
+
+  // sync 写入改为串行并带配额守卫（默认设置体积很小，正常不会触发降级）
+  if (sync) {
+    if (settings && area) {
+      await writeSettingsToSync(sync, SETTINGS_SYNC_KEY, normalizeStoredSettings(DEFAULT_SETTINGS, Date.now()));
+    }
+    if (progress) {
+      try {
+        await sync.remove(PROGRESS_SYNC_KEY);
+      } catch {
+        // 移除失败不影响本地清理，最后一次真实写入会刷新台账
+      }
+    }
+  }
 
   return {
     settingsReset,

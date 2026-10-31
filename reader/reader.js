@@ -28,6 +28,7 @@ import {
   getReaderSettings,
   getReadingStats,
   getRecentFiles,
+  getSyncStatus,
   importBackupSnapshot,
   listAllProgress,
   listBookmarks,
@@ -265,6 +266,9 @@ const elements = {
   onboardingNext: document.getElementById("onboarding-next"),
   // FR-S4 无障碍
   a11yContrastStatus: document.getElementById("a11y-contrast-status"),
+  syncStatusBadge: document.getElementById("sync-status-badge"),
+  syncStatusDetail: document.getElementById("sync-status-detail"),
+  syncUsage: document.getElementById("sync-usage"),
   skipToContent: document.getElementById("skip-to-content"),
   readerMain: document.getElementById("reader-main")
 };
@@ -882,6 +886,62 @@ function updateContrastStatus() {
   const ratio = Number(audit.worst?.ratio || 0).toFixed(2);
   target.textContent = `${t("a11yContrastWarn", { count: audit.failures.length })} · ${t("a11yContrastRatio", { ratio })}`;
   target.classList.add("is-warning");
+}
+
+// ---------- v0.8 L-02 同步状态展示 ----------
+
+/**
+ * 渲染 sync 配额守卫的结果。
+ *
+ * 三态：已同步 / 已同步（精简模式）/ 未同步（含原因）。
+ * 未同步时必须把原因说具体，否则用户只会看到"设置没同步"而无法自救。
+ */
+function renderSyncStatus() {
+  const badge = elements.syncStatusBadge;
+  const detail = elements.syncStatusDetail;
+  const usage = elements.syncUsage;
+  if (!badge) {
+    return;
+  }
+
+  const status = getSyncStatus();
+  badge.textContent = t(status.titleKey);
+  badge.classList.toggle("is-ok", status.synced && !status.degraded);
+  badge.classList.toggle("is-degraded", status.synced && status.degraded);
+  badge.classList.toggle("is-failed", !status.synced);
+
+  if (usage) {
+    usage.textContent = status.usageText ? `${t("syncStateUsage")} ${status.usageText}` : "";
+  }
+
+  if (!detail) {
+    return;
+  }
+  if (status.synced && !status.degraded) {
+    detail.textContent = "";
+    detail.classList.add("hidden");
+    return;
+  }
+
+  detail.classList.remove("hidden");
+  if (status.degraded) {
+    const dropped = (status.droppedFields || [])
+      .map((field) => {
+        const key = `syncStateDrop${field.charAt(0).toUpperCase()}${field.slice(1)}`;
+        const text = t(key);
+        // 未翻译的字段名不要露出来，退化为通用说明
+        return text === key ? "" : text;
+      })
+      .filter(Boolean);
+    // 用当前语言的分隔符拼接，避免中文界面里冒出英文分号
+    const joiner = getCurrentLocale() === "zh_CN" ? "；" : "; ";
+    detail.textContent = [t("syncStateDegradedDetail"), dropped.join(joiner)].filter(Boolean).join(joiner);
+    detail.classList.add("is-warning");
+    return;
+  }
+
+  detail.textContent = status.detailKey ? t(status.detailKey) : status.message;
+  detail.classList.add("is-warning");
 }
 
 const GIST_CONFIG_KEY = "gistCloudConfig";
@@ -1563,6 +1623,7 @@ function setSettingsOverlay(open) {
     return;
   }
   settingsPanel.prepareOpen();
+  renderSyncStatus();
   settingsTrap.activate();
 }
 
@@ -2595,6 +2656,8 @@ async function handleSettingsChange() {
   }
   detectPagesPerView();
   await saveReaderSettings(state.settings);
+  // 写入后立刻刷新同步状态：超配额时用户必须当场看到「未同步」
+  renderSyncStatus();
   rebuildPages();
 }
 
