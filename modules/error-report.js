@@ -39,6 +39,34 @@ const MAX_STACK_LINES = 12;
 const MAX_CONTEXT_ENTRIES = 20;
 const MAX_CONTEXT_VALUE_LENGTH = 64;
 
+// 中文（含中日韩统一表意文字、扩展 A、兼容区）与常见全角标点。
+// 这些字符在「技术性错误信息」里几乎不会出现，一旦出现基本就是用户数据混进来了。
+const CJK_TEXT = /[\u3000-\u303F\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g;
+
+// 常见凭证形态：ghp_ / github_pat_ / gho_ / gist / Bearer / AKIA 等
+const SECRET_PATTERN = /\b(?:gh[pousr]_[A-Za-z0-9]{8,}|github_pat_[A-Za-z0-9_]{8,}|AKIA[0-9A-Z]{12,}|Bearer\s+[A-Za-z0-9._-]{8,})\b/g;
+
+// 邮箱与「book=xxx」「gist=xxx」这类键值片段
+const EMAIL_PATTERN = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
+const KV_SECRET_PATTERN = /\b(?:book|title|text|content|gist|token|password|secret|email)\s*[=:]\s*[^\s,;]+/gi;
+
+/**
+ * 清理自由文本（错误 message / stack 首行）。
+ *
+ * 原生错误（`Cannot read properties of undefined`、`QuotaExceededError` 等）原样保留；
+ * 一旦文本里混进中文明文、token、邮箱或 `book=书名` 这类片段，说明业务代码把用户数据
+ * 拼进了错误信息——这时候整段抹掉比逐字打码可靠。
+ */
+export function redactFreeText(value = "") {
+  return String(value || "")
+    .replace(SECRET_PATTERN, "[redacted-token]")
+    .replace(EMAIL_PATTERN, "[redacted-email]")
+    .replace(KV_SECRET_PATTERN, "[redacted]")
+    .replace(CJK_TEXT, "[redacted-text]")
+    .replace(/\[redacted-text\](?:\s*\[redacted-text\])+/g, "[redacted-text]")
+    .trim();
+}
+
 /** 只保留浏览器名与大版本号，不保留完整 UA（避免指纹化，也避免携带系统细节） */
 export function detectPlatform(userAgent = "") {
   const match = /(Edg|Chrome|Firefox|Safari)\/(\d+)/.exec(userAgent || "");
@@ -57,14 +85,17 @@ export function anonymizeStack(stack = "") {
   return String(stack || "")
     .split("\n")
     .slice(0, MAX_STACK_LINES)
-    .map((line) =>
-      line
+    .map((line) => {
+      const cleaned = line
         // 先去掉协议头，剩下的按普通路径处理，才能抹掉 home 目录里的用户名
         .replace(/file:\/\/(?=\/)/g, "")
         .replace(/https?:\/\/[^\s/)]+/g, "")
         .replace(/[a-zA-Z]:\\[^\s)]*\\/g, "")
-        .replace(/\/(?:Users|home)\/[^/\s:)]+/g, "/~")
-    )
+        .replace(/\/(?:Users|home)\/[^/\s:)]+/g, "/~");
+      // 首行是 `Error: <message>`，和 message 字段一样可能夹带用户数据；
+      // 其余行里的 URI 路径也可能含用户名或书名字符，同样走一遍脱敏。
+      return redactFreeText(cleaned);
+    })
     .join("\n")
     .slice(0, MAX_STACK_LENGTH);
 }
@@ -120,12 +151,15 @@ export function buildReportPayload({
   context = {},
   timestamp = Date.now()
 } = {}) {
+  // message 与 stack 是自由文本，业务代码把正文 / 书名拼进 Error 的情况真实存在
+  // （例如 `throw new Error(\`解析失败：\${text.slice(0,50)}\`)`）。
+  // 这两处必须和 context 一样做脱敏，否则「绝不含正文」的承诺就只是纸面上的。
   return {
     version: String(version),
     platform: String(platform),
     type: "uncaught_exception",
-    name: String(error?.name || "Error"),
-    message: String(error?.message || "").slice(0, MAX_MESSAGE_LENGTH),
+    name: redactFreeText(error?.name || "Error").slice(0, 64) || "Error",
+    message: redactFreeText(error?.message || "").slice(0, MAX_MESSAGE_LENGTH),
     stack: anonymizeStack(error?.stack),
     timestamp,
     context: sanitizeContext(context)

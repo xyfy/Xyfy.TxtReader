@@ -20,6 +20,7 @@ import {
 import { getDefaultSettings, normalizeStoredSettings } from "../modules/storage.js";
 import { SCENE_PRESETS } from "../modules/scene-mode.js";
 import { REJECT_REASONS, classifyDroppedFiles } from "../modules/import-queue.js";
+import { READER_STATES, resolveReaderViewState } from "../modules/reader-view-state.js";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const readHtml = (relative) => readFileSync(join(projectRoot, relative), "utf8");
@@ -334,6 +335,23 @@ function run() {
     assert.equal(batchHit.rejected[0]?.reason, REJECT_REASONS.DUPLICATE, "批内重复应判 duplicate");
 
     console.log("✓ TC-REG-08 批量导入去重覆盖书库已有文件，多原因提示不丢信息");
+  }
+
+  // ---------- TC-REG-09 v0.8 P1 回归：四态首屏必须显式渲染 ----------
+  {
+    const readerSource = readFileSync(join(projectRoot, "reader/reader.js"), "utf8");
+    const bootBody = readerSource.slice(readerSource.indexOf("async function bootstrap()"));
+    assert.match(
+      bootBody,
+      /renderReaderState\(\)/,
+      "bootstrap 未调用 renderReaderState：书库为空时空态面板会一直停在 hidden，用户看到空白阅读区"
+    );
+    // 四态判定本身：无书 → 空态，有书 → 阅读态
+    assert.equal(resolveReaderViewState({ hasBook: false }), READER_STATES.EMPTY);
+    assert.equal(resolveReaderViewState({ hasBook: true }), READER_STATES.READING);
+    assert.equal(resolveReaderViewState({ isLoading: true }), READER_STATES.LOADING);
+    assert.equal(resolveReaderViewState({ error: new Error("x") }), READER_STATES.ERROR);
+    console.log("✓ TC-REG-09 首屏四态显式渲染，无书时进入空态而非空白");
   }
 
   // ---------- 版本号一致性：发版最容易漏掉的就是某处没跟着改 ----------

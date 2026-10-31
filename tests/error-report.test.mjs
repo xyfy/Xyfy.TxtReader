@@ -1,4 +1,4 @@
-// FR-C3 可选错误上报开关：TC-C3-01 / TC-C3-02
+// FR-C3 可选错误上报开关：TC-C3-01 / TC-C3-02 / TC-C3-03
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -108,6 +108,37 @@ async function run() {
   assert.equal(payload.context.book, undefined, "对象类型不得进入上下文");
   console.log("✓ TC-C3-02 开启后仅含匿名技术信息，无正文/Token/PII");
 
+  // TC-C3-03：message 与 stack 本身夹带用户数据
+  // 业务代码把正文拼进 Error 是真实存在的写法（`throw new Error(\`解析失败：\${text.slice(0,50)}\`)`），
+  // 只清洗 context 挡不住这条路径。
+  const leakedText = "雨停的时候屋檐下的水珠还在滴";
+  const leakedBook = "某本秘密小说";
+  const leakedToken = "ghp_SECRETLEAKTOKEN1234567890";
+  const leaky = new Error(`解析失败：${leakedText} book=${leakedBook} ${leakedToken}`);
+  leaky.stack = [
+    `Error: 解析失败：${leakedText} book=${leakedBook} ${leakedToken}`,
+    "    at reader.js:1:1",
+    "    at https://example.com/u/某些用户名/reader.js:2:3"
+  ].join("\n");
+  const leakPayload = buildReportPayload({ error: leaky, version: "0.8.0", platform: "Chrome/141" });
+  const leakSerialized = JSON.stringify(leakPayload);
+  assert.ok(!leakSerialized.includes(leakedText), "TC-C3-03 message/stack 残留正文");
+  assert.ok(!leakSerialized.includes(leakedBook), "TC-C3-03 message/stack 残留书名");
+  assert.ok(!leakSerialized.includes(leakedToken), "TC-C3-03 message/stack 残留 Token");
+  assert.ok(!leakSerialized.includes("某些用户名"), "TC-C3-03 stack 路径残留用户名");
+  assert.ok(leakPayload.stack.includes("reader.js"), "TC-C3-03 脱敏后仍需保留可定位的文件名");
+
+  // 原生技术错误必须原样保留，否则上报失去排查价值
+  for (const message of [
+    "Cannot read properties of undefined (reading 'length')",
+    "QUOTA_BYTES_PER_ITEM quota exceeded",
+    "Failed to fetch"
+  ]) {
+    const native = buildReportPayload({ error: new Error(message) });
+    assert.equal(native.message, message, `原生技术错误信息不应被改写：${native.message}`);
+  }
+  console.log("✓ TC-C3-03 message/stack 里的正文、书名、Token 被脱敏，原生技术错误原样保留");
+
   // 匿名化：路径里的用户名与站点域名必须被抹掉
   const stack = payload.stack;
   assert.ok(!stack.includes("zhangsan"), "调用栈残留了系统用户名");
@@ -177,7 +208,7 @@ async function run() {
   }
   console.log("✓ 隐私政策已说明上报内容与默认关闭");
 
-  console.log("error report tests passed (TC-C3-01~02)");
+  console.log("error report tests passed (TC-C3-01~03)");
 }
 
 run();

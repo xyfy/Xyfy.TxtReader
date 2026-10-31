@@ -3072,6 +3072,11 @@ async function bootstrap() {
     await loadBook(state.books[0].id);
   }
 
+  // 首次渲染必须显式跑一遍四态判定：
+  // 书库为空时没有 loadBook 触发渲染，空态面板会一直停在 HTML 里的 hidden，
+  // 用户看到的是空白阅读区而不是「还没有导入书」的引导。
+  renderReaderState();
+
   // 首次引导：先套用设备推荐值，再展示引导，用户第一眼看到的就是适合当前屏幕的版式
   if (shouldShowOnboarding({ settings: state.settings, bookCount: state.books.length })) {
     await applyFirstRunDefaults();
