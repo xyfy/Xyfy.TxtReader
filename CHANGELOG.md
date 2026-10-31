@@ -50,6 +50,20 @@
 - 版本号 0.8.1 → **1.0.0**（`package.json` / `manifest.json` / `package-lock.json` / `modules/app-info.js` / `README.md` 五处同步，由回归测试断言守护）。
 - 本版**不含任何功能改动**——纯版本与文档冻结，代码与 v0.8.1 完全一致。
 
+### Docs
+- **隐私政策第 8 条修正**（`privacy-policy.html`）：原文写「若当前版本尚未接入上报端点，即便开启开关也只会本地记录」，措辞含糊。经核验 `reader/reader.js` 的 `errorReporter` 传入 `transport: null`，**1.0.0 确实未接入任何上报端点**，开启开关也只写本机控制台。已改为明确表述，并补充「message/stack 上报前再做一次自由文本脱敏」这一实际行为（对应 DEF-04 修复）。中英文同步更新，生效日期更新为 2026-10-31。
+- **商店文案同步**（`docs/store-listing.md`）：中英文两处错误上报说明均补充「1.0.0 未接入端点，不发送任何数据」。
+- **新增回滚预案**（`docs/rollback-runbook.md`）：记录 v0.8.1 / v1.0.0 包 SHA-256、触发条件、商店与仓库回滚步骤、回滚后必做项。回滚目标 v0.8.1 已归档在 Release 附件中。
+
+### 权限审计结论（manifest 无未使用权限）
+| 权限 | 用途 | 使用点 | 结论 |
+|------|------|--------|------|
+| `storage` | 本地数据与 sync 镜像 | `storage.js` / `i18n.js` / `reader.js` / `sync-quota.js` | ✅ 必需 |
+| `permissions` | 运行时按需申请 Gist 主机权限 | `reader.js` `chrome.permissions.contains/request` | ✅ 必需，非静态索取 |
+| `optional_host_permissions: api.github.com/*` | Gist 备份读写 | `gist-provider.js` | ✅ 可选，安装时不生效 |
+
+> 无 `tabs` / `scripting` / `cookies` / `<all_urls>` / content_scripts，无静态 host 权限。
+
 ## v0.8.1 - 2026-11-02
 
 > v0.8.0 验收（RT-01~11）发现的 4 个 P1 缺陷集中修复。全部为 v0.7 新增能力的边界遗漏。

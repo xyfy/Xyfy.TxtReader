@@ -62,7 +62,7 @@
     <main class="wrap">
       <article class="card">
         <h1>Xyfy TXT Reader 隐私政策</h1>
-        <p class="meta">生效日期：2026-10-28（上次更新：2026-10-30）</p>
+        <p class="meta">生效日期：2026-10-28（上次更新：2026-10-31）</p>
 
         <p>
           Xyfy TXT Reader（以下简称“本扩展”）尊重并保护用户隐私。本政策说明本扩展会收集、处理和存储哪些数据，以及这些数据如何被使用。
@@ -127,9 +127,9 @@
         <ul>
           <li><strong>默认关闭</strong>：本扩展的“匿名错误上报”开关出厂即为关闭状态，未开启时不会向任何服务器发送错误信息，异常仅记录在本机控制台，便于用户自行排查。</li>
           <li><strong>开启后上报的内容</strong>：仅包含应用版本号、浏览器名称与大版本号（如 <code>Chrome/141</code>）、错误类型、错误名称、错误消息、已匿名化的调用栈（去掉域名、本机用户名与绝对路径）、事件发生时间戳，以及少量技术性上下文（如出错阶段、章节序号）。</li>
-          <li><strong>明确不包含</strong>：TXT 正文、书名、文件名、Gist Token 或任何凭证、邮箱等个人信息。上下文采用“键名白名单 + 值形态校验”双重过滤，白名单外的字段一律丢弃。</li>
+          <li><strong>明确不包含</strong>：TXT 正文、书名、文件名、Gist Token 或任何凭证、邮箱等个人信息。上下文采用“键名白名单 + 值形态校验”双重过滤，白名单外的字段一律丢弃；错误消息与调用栈在上报前还会再做一次自由文本脱敏（凭证、邮箱、<code>key=value</code> 形式的敏感值、中日韩文字与全角标点均替换为占位符），仅原生技术错误信息原样保留。</li>
           <li><strong>随时关闭</strong>：在“设置 → 常规”中取消勾选即可立即停止上报，关闭后不再发送任何数据。</li>
-          <li><strong>历史版本说明</strong>：若当前版本尚未接入上报端点，即便开启开关也只会本地记录，不会对外发送。</li>
+          <li><strong>当前版本说明（1.0.0）</strong>：<strong>当前版本尚未接入任何上报端点</strong>。即便用户开启该开关，扩展也只会把已脱敏的错误信息写入本机控制台，<strong>不会向任何服务器发送数据</strong>。上报端点上线时，本政策会先行更新并标注新的生效日期。</li>
         </ul>
 
         <h2>9. 阅读统计与最近文件</h2>
@@ -156,7 +156,7 @@
         <hr class="lang-divider" />
 
         <h1>Privacy Policy (English)</h1>
-        <p class="meta">Effective date: 2026-10-28 (last updated: 2026-10-30)</p>
+        <p class="meta">Effective date: 2026-10-28 (last updated: 2026-10-31)</p>
 
         <p>
           Xyfy TXT Reader (the "Extension") respects your privacy. This policy explains what data is processed and where it is stored.
@@ -221,9 +221,9 @@
         <ul>
           <li><strong>Off by default</strong>: the "Anonymous error reporting" toggle ships disabled. When it is off, nothing is sent to any server; errors are only logged locally in the console.</li>
           <li><strong>What is sent when enabled</strong>: app version, browser name and major version (e.g. <code>Chrome/141</code>), error type, error name, error message, an anonymised stack trace (domain, local username and absolute paths removed), the timestamp, and a small amount of technical context such as the failing phase or chapter index.</li>
-          <li><strong>What is never sent</strong>: TXT content, book or file names, Gist tokens or any credentials, email addresses, or any other personal data. Context is filtered twice — by an allow-list of keys and by a strict value shape check; anything outside the allow-list is dropped.</li>
+          <li><strong>What is never sent</strong>: TXT content, book or file names, Gist tokens or any credentials, email addresses, or any other personal data. Context is filtered twice — by an allow-list of keys and by a strict value shape check; anything outside the allow-list is dropped. The error message and stack trace are additionally redacted as free text before reporting (credentials, emails, <code>key=value</code> secrets, and CJK characters are replaced with placeholders; only native technical error text is kept verbatim).</li>
           <li><strong>Opt out at any time</strong>: uncheck the toggle in Settings → General to stop reporting immediately.</li>
-          <li><strong>Current status</strong>: if no reporting endpoint is bundled with the current version, enabling the toggle still results in local logging only.</li>
+          <li><strong>Current version status (1.0.0)</strong>: <strong>no reporting endpoint is bundled in the current version.</strong> Even with the toggle enabled, the extension only writes redacted error details to the local console and <strong>sends nothing to any server</strong>. This policy will be updated with a new effective date before any endpoint goes live.</li>
         </ul>
 
         <h2>9. Reading Stats and Recent Files</h2>
