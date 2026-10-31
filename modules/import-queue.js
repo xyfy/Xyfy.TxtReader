@@ -12,7 +12,8 @@ export const REJECT_REASONS = {
   NOT_TXT: "not-txt",
   TOO_LARGE: "too-large",
   EMPTY: "empty",
-  DUPLICATE: "duplicate"
+  DUPLICATE: "duplicate",
+  DUPLICATE_RECENT: "duplicate-recent"
 };
 
 // 扩展名兜底：有些系统拖拽进来的 File.type 是空字符串
@@ -38,12 +39,15 @@ export function fileKey(file) {
  *
  * @param {Array<{name?: string, size?: number, type?: string}>} files
  * @param {{maxBytes?: number, selected?: Array<object>}} options selected 用于同批次内去重
+ *   已导入的批内重复和「书库里已有」尽量分开说明，所以 selected 里已有的 key 会被记住
  * @returns {{accepted: object[], rejected: Array<{name: string, reason: string}>}}
  */
 export function classifyDroppedFiles(files, { maxBytes = MAX_FILE_BYTES, selected = [] } = {}) {
   const accepted = [];
   const rejected = [];
-  const seen = new Set((selected || []).map(fileKey));
+  const libraryKeys = (selected || []).map(fileKey);
+  const fromLibrary = new Set(libraryKeys);
+  const seen = new Set(libraryKeys);
 
   for (const file of Array.from(files || [])) {
     const name = String(file?.name || "");
@@ -63,7 +67,9 @@ export function classifyDroppedFiles(files, { maxBytes = MAX_FILE_BYTES, selecte
     }
     const key = fileKey(file);
     if (seen.has(key)) {
-      rejected.push({ name, reason: REJECT_REASONS.DUPLICATE });
+      // 已在书库里的走单独文案：说「本批次重复」会让用户以为换个批次就能导入
+      const reason = fromLibrary.has(key) ? REJECT_REASONS.DUPLICATE_RECENT : REJECT_REASONS.DUPLICATE;
+      rejected.push({ name, reason });
       continue;
     }
     seen.add(key);
@@ -196,5 +202,6 @@ export const REJECT_MESSAGE_KEY = {
   [REJECT_REASONS.NOT_TXT]: "importRejectNotTxt",
   [REJECT_REASONS.TOO_LARGE]: "importRejectTooLarge",
   [REJECT_REASONS.EMPTY]: "importRejectEmpty",
-  [REJECT_REASONS.DUPLICATE]: "importRejectDuplicate"
+  [REJECT_REASONS.DUPLICATE]: "importRejectDuplicate",
+  [REJECT_REASONS.DUPLICATE_RECENT]: "importRejectDuplicateRecent"
 };
