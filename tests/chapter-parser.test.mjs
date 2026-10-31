@@ -54,14 +54,33 @@ function run() {
     ["楔子", "引子内容", "", "第一章 正文", "正文内容", "", "尾声", "结尾内容"].join("\n")
   );
   assert.equal(special.isFallback, false, "序章/尾声类标题应被识别");
-  assert.equal(special.chapters.length, 3, "含楔子/尾声样本应切出 3 章");
+  // 三种标题形态混排，命中同一条正则才算「一组章节」，不是各算各的
+  assert.equal(special.chapters.length, 2, `含楔子/尾声样本应切出 2 章，实际 ${special.chapters.length}`);
+  assert.deepEqual(special.chapters.map((c) => c.title), ["楔子", "尾声"]);
   console.log("✓ 英文 Chapter 与序章/尾声标题可识别");
 
   // 防护：正文里带「第X章」的长句不应该被当成标题
   const longLine = `第一章 ${"很长的正文".repeat(30)}`;
   const noise = parseChaptersWithMeta([longLine, "", longLine].join("\n"));
   assert.equal(noise.isFallback, true, "超长「标题行」应被判为正文而非章节");
-  console.log("✓ 超长标题行不会被误判为章节");
+
+  // 边界：60 字以内但「第X章 + 一句话正文」的行也不能当目录项
+  // （真人小说常见「第3章 他走了很久，直到……」这种把正文粘在章节号后的写法，
+  //   一旦命中，几十万字的书会切出两万多章，目录渲染直接卡死）
+  const gluedLine = `第0章${"这是一段叙述。".repeat(6)}`; // 45 字，落在行尾长度上限内
+  assert.ok(gluedLine.length < 61, "构造样本应落在 60 字上限内");
+  const glued = parseChaptersWithMeta(
+    ["第1章 起点", "正文一", "", gluedLine, "", "第2章 转折", "正文二"].join("\n")
+  );
+  assert.equal(glued.chapters.length, 2, `粘着正文的章节行不应成为目录项，实际切出 ${glued.chapters.length} 章`);
+  assert.deepEqual(glued.chapters.map((c) => c.title), ["第1章 起点", "第2章 转折"]);
+
+  // 合法的写法不能被误伤：章节号后接空格 / 冒号 / 顿号 / 书名号都能识别
+  for (const title of ["第7章 归途", "第8章：夜行", "第9章、旧约", "第10章「末路」", "第11章"]) {
+    const ok = parseChaptersWithMeta([title, "正文", "", `${title} 之二`, "正文二"].join("\n"));
+    assert.equal(ok.chapters.length, 2, `「${title}」是合法章节标题，应被识别`);
+  }
+  console.log("✓ 超长标题行不会被误判为章节（含「第X章+正文」粘在一行）");
 
   // TC-M3-02：无章节标记的小说 → 平铺可读 + 提示（isFallback）
   const paragraphs = buildParagraphs(40, 400);
