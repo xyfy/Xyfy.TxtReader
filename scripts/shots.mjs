@@ -125,11 +125,16 @@ function readExtId() {
   console.log('▶ 启动 Chromium（加载扩展）…');
   const context = await chromium.launchPersistentContext(PROFILE, {
     headless: false, // 扩展必须在有头模式加载
+    // 关键：Playwright 默认带 --disable-extensions，会连我们的 --load-extension 一起禁用。
+    // 必须显式忽略该默认参数，否则扩展子系统根本不初始化（Extensions 目录都不会创建）。
+    ignoreDefaultArgs: ['--disable-extensions'],
     args: [
       `--load-extension=${EXT}`,
       `--disable-extensions-except=${EXT}`,
       '--no-sandbox',
       '--disable-dev-shm-usage',
+      '--no-first-run',
+      '--no-default-browser-check',
     ],
     viewport: { width: 1280, height: 800 },
   });
