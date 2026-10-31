@@ -11,6 +11,7 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import { findExtensionId } from './lib/find-ext-id.mjs';
+import { ensureOnboardingDismissed } from './lib/reader-ui.mjs';
 
 const EXT = process.cwd();
 const PROFILE = path.join(EXT, '.shot-profile-diag');
@@ -116,6 +117,9 @@ async function finish(context) {
     await finish(context);
     return;
   }
+
+  await sleep(600);
+  await ensureOnboardingDismissed(page); // 关闭首次引导浮层，否则盖住正文、诊断失真
 
   const sel = await page.evaluate(() => {
     const has = (s) => !!document.querySelector(s);

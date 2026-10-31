@@ -27,6 +27,7 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import { findExtensionId } from './lib/find-ext-id.mjs';
+import { ensureOnboardingDismissed } from './lib/reader-ui.mjs';
 
 const EXT = process.cwd(); // 仓库根目录（含 manifest.json）
 
@@ -176,6 +177,7 @@ async function diagShot(page, label) {
     await page.goto(`${base}/reader/reader.html`, { timeout: 20000 });
     await page.waitForSelector('#reader-main', { timeout: 15000 });
     await sleep(600);
+    await ensureOnboardingDismissed(page); // 关闭首次引导浮层，否则盖住正文导致截图失真
     await page.screenshot({ path: path.join(OUT, '01-import.png') });
   });
 
