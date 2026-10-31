@@ -19,6 +19,7 @@
     "test:regression": "node tests/regression.test.mjs",
     "gen:samples": "node scripts/gen-test-samples.mjs",
     "shots": "node scripts/shots.mjs",
+    "diag": "node scripts/diag-shots.mjs",
     "test:backup": "node tests/backup.test.mjs",
     "test:storage-sync": "node tests/storage-sync.test.mjs",
     "test:keyboard": "node tests/keyboard-map.test.mjs",
