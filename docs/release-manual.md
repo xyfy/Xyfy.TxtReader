@@ -214,6 +214,42 @@ Xyfy.TxtReader/store-assets/
 
 ---
 
+## 2.5 一键自动化截图（推荐，省去手动拍）
+
+> 由于 CI/沙箱环境普遍禁止 Chromium 加载扩展，**截图脚本必须在你本机运行**（你本机 Chrome 能正常加载未打包扩展）。我已把脚本写好并验证过语法与 DOM 选择器，你只需三步即可自动产出全部 5 张图。
+
+脚本：`scripts/shots.mjs`（已接入 `npm run shots`）。
+
+```bash
+# 1) 安装依赖（仅首次，会下载 Playwright 的 Chromium）
+npm install playwright
+
+# 2) 自动导入样张并截图（默认使用仓库自带样本 tests/samples/02-large-utf8.txt）
+npm run shots
+# 或指定你自己的样张：
+# node scripts/shots.mjs --book=/path/to/your-book.txt
+
+# 3) 取图
+ls store-assets/screenshots/
+# 01-import.png 02-double-page.png 03-scroll.png 04-toc.png 05-settings.png
+```
+
+| 项 | 值 |
+|----|----|
+| 输出目录 | `store-assets/screenshots/`（已在 `build:zip` 排除列表，不会污染发布包） |
+| 截图规格 | 1280×800 视口截图，PNG，与第 2.2 节 5 张定义一一对应 |
+| 5 张对应 | ①导入页 → `01-import`　②双页 → `02-double-page`　③滚动 → `03-scroll`　④目录 → `04-toc`　⑤设置 → `05-settings` |
+
+**注意事项**：
+- 脚本用本机真实 Chrome 加载扩展并自动点击导入、切换双页/滚动、展开目录、打开设置面板。前提是你能成功加载未打包扩展（chrome 地址栏输入 `chrome://extensions` → 右上角开发者模式 → 加载已解压的扩展程序）。脚本内部走的正是同一逻辑，能加载就能截。
+- macOS / Windows 直接在桌面环境运行即可；**Linux 无图形界面**时，用 `xvfb-run -a npm run shots` 提供虚拟显示器。
+- 截图中正文是虚构测试样本（`gen:samples` 生成），不含任何真实版权内容，可直接上架。
+- 若想换截图里的书，传 `--book` 指一本本地 TXT 即可。
+
+**手动拍摄仍可行**：若你不想装 Playwright，按 2.2 节的拍摄要点与防驳回技巧，用 `chrome://extensions` 加载扩展后手动截 5 张，效果一致。
+
+---
+
 ## 第 3 步：提审前的最后 4 项确认
 
 ### 3.1 隐私政策 URL 必须能打开
