@@ -10,6 +10,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import { findExtensionId } from './lib/find-ext-id.mjs';
 
 const EXT = process.cwd();
 const PROFILE = path.join(EXT, '.shot-profile-diag');
@@ -45,18 +46,6 @@ function ensureFiction() {
   fs.mkdirSync(path.dirname(FICTION), { recursive: true });
   fs.writeFileSync(FICTION, lines.join('\n'), 'utf8');
   return FICTION;
-}
-
-function readExtId() {
-  const base = path.join(PROFILE, 'Default/Extensions');
-  if (!fs.existsSync(base)) return null;
-  for (const id of fs.readdirSync(base)) {
-    const verDir = path.join(base, id);
-    for (const ver of fs.readdirSync(verDir)) {
-      if (fs.existsSync(path.join(verDir, ver, 'manifest.json'))) return id;
-    }
-  }
-  return null;
 }
 
 async function snap(page, name) {
@@ -100,11 +89,12 @@ async function finish(context) {
 
   let extId = null;
   for (let i = 0; i < 40 && !extId; i++) {
-    extId = readExtId();
+    extId = await findExtensionId(context, PROFILE, EXT);
     if (!extId) await sleep(500);
   }
   log('\n=== 扩展加载 ===');
   log('  Default/Extensions 存在 =', fs.existsSync(path.join(PROFILE, 'Default/Extensions')));
+  log('  Default/Preferences 存在 =', fs.existsSync(path.join(PROFILE, 'Default', 'Preferences')));
   log('  扩展 ID =', extId || '(未找到)');
   if (!extId) {
     log('❌ 扩展未加载，停止。请确认 manifest.json 在仓库根目录，且本机 chrome://extensions 开发者模式能手动加载未打包扩展。');
