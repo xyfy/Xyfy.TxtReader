@@ -164,16 +164,22 @@ Chrome 商店最少 1 张，建议 3–5 张。
 4. **不要 P 上虚假功能**：截图里的界面必须是当前版本真实存在的，1.0 的截图里不要出现 EPUB / TTS 之类不存在的东西。
 5. 中英文各一套更好（Chrome 商店按语言展示），至少准备中文一套。
 
-**存放位置建议**（当前仓库里没有任何截图文件，需要你自己建）：
+**存放位置**（⚠️ 仓库里目前**没有这个目录**，全部是本地产物，由你或脚本来建）：
 
 ```
-Xyfy.TxtReader/store-assets/
-├── screenshots/    01-import.png … 05-settings.png
-├── promo/          440x280.png / 920x680.png / 1400x560.png
-└── icons/          直接从 icons/ 复制
+Xyfy.TxtReader/store-assets/        ← 手动建，或首次跑 npm run shots 时自动生成
+├── screenshots/    01-import.png … 05-settings.png   ← 由 npm run shots 自动生成（见 2.5），不用手建
+├── promo/          ← 可选，详见下方；不建也完全没问题
+└── icons/          可选，直接从仓库根 icons/ 复制
 ```
 
-> `store-assets/` 不需要进发布包。已在 `package.json` 的 `build:zip` 里加上 `'store-assets/*'` 排除规则，并实测验证过：建了目录后重新打包，包内条目数仍为 49、SHA-256 仍为 `b61586bf…9bd8b167`，素材不会污染发布包。
+- `screenshots/`：**不用你手动建**，`npm run shots` 会自动创建目录并写入 5 张图（见 2.5 节）。这 5 张就是商店要的截图。
+- `promo/`：**可选，且仓库不预置任何图片**。宣传图属于商店营销素材，需用设计工具按下方尺寸自制，或按 2.3 节建议第一版直接跳过。需要时才建这个目录、把图放进去即可。
+  - 440×280（搜索卡片小图）、920×680（详情页大图）、1400×560（Featured 横幅，需向 Google 申请）
+  - 文件名随意，商店后台按上传位置区分；参考命名：`440x280.png` / `920x680.png` / `1400x560.png`。
+  - 目录里已放 `promo/README.md` 说明规格，照着出图即可。
+
+> `store-assets/` 不需要进发布包（也不建议提交进 git）。已在 `package.json` 的 `build:zip` 里加上 `'store-assets/*'` 排除规则，并实测验证过：建了目录后重新打包，包内条目数仍为 49、SHA-256 仍为 `b61586bf…9bd8b167`，素材不会污染发布包。
 
 ### 2.3 宣传图——可选，不影响过审
 
