@@ -10,7 +10,7 @@
 | 版本 | 包文件 | 大小 | SHA-256 |
 |------|--------|------|---------|
 | **v0.8.1（回滚目标）** | `dist/xyfy-txt-reader-v0.8.1.zip` | 149080 B | `9fa0101ba9a6a2880a5a2ee2b265cd6025ac464177386b630e7f50e82d01b5fe` |
-| v1.0.0（当前发布） | `dist/xyfy-txt-reader-v1.0.0.zip` | 150425 B | `4677ebb371e00b23c9b267105c4885eb8aca37f60edd922951e37a6ba945df1a` |
+| v1.0.0（当前发布） | `dist/xyfy-txt-reader-v1.0.0.zip` | 151445 B | `b61586bf6200b71405201b11cbfa28d466c7ffb146532cee07f538eb9bd8b167` |
 
 两包均已上传 GitHub Release 附件，可长期取回：
 
@@ -77,6 +77,6 @@ git commit -m "revert: 1.0.0 冻结回滚（原因：<P0 描述>）"
 | v0.8.1 包存在且可解压 | ✅ 149080 B，包内 manifest 版本 `0.8.1` |
 | v0.8.1 包 SHA-256 记录 | ✅ `9fa0101b…d01b5fe` |
 | v0.8.1 Release 可访问 | ✅ tag 与附件均在 |
-| v1.0.0 包 SHA-256 记录 | ✅ `4677ebb3…a945df1a` |
+| v1.0.0 包 SHA-256 记录 | ✅ `b61586bf…9bd8b167`（与 GitHub Release 附件 digest 一致） |
 | 回滚是否丢数据 | ✅ 否——回滚不动 IndexedDB 与 storage |
 | 回滚窗口 | 商店侧 1–24h（Chrome）/ 1–3 天（Edge） |
