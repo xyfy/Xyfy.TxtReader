@@ -47,10 +47,10 @@ const file = (name, size = 1024, type = "text/plain") => ({ name, size, type, la
     assert.ok(REJECT_MESSAGE_KEY[reason], `拒绝原因 ${reason} 缺少文案键`);
   }
 
-  // 与已选列表一起去重（用户先选 2 个又拖进同样的 1 个）
+  // 与已选列表（= 书库里已有）一起去重：文案要说「已在书库」，不能说是本批次重复
   const withSelected = classifyDroppedFiles([file("a.txt")], { selected: [file("a.txt")] });
   assert.equal(withSelected.accepted.length, 0, "与已选列表重复的文件应被拒");
-  assert.equal(withSelected.rejected[0].reason, REJECT_REASONS.DUPLICATE);
+  assert.equal(withSelected.rejected[0].reason, REJECT_REASONS.DUPLICATE_RECENT, "书库里已有的应走 duplicate-recent");
 
   console.log("✓ TC-C1-01 拖拽筛选：类型/空文件/超大/重复均给出明确原因");
 }

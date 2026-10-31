@@ -2261,12 +2261,14 @@ async function importFileCore(file, encoding = null) {
   }
 
   const { chapters, isFallback } = parseChaptersWithMeta(imported.text);
+  // 同一文件再导入一次应该只是「重新打开」，而不是把同一本书追加成第二条
+  const reopened = Boolean(await getBook(imported.id));
   const saved = await saveBook({
     ...imported,
     chapters
   });
 
-  return { saved, isFallback };
+  return { saved, isFallback, reopened };
 }
 
 async function importFile(file, encoding = null) {
@@ -2281,7 +2283,7 @@ async function importFile(file, encoding = null) {
   renderReaderState();
 
   try {
-    const { saved, isFallback } = await importFileCore(file, encoding);
+    const { saved, isFallback, reopened } = await importFileCore(file, encoding);
 
     state.chapterPageCache.clear();
     state.books = await listBooks();
@@ -2293,6 +2295,8 @@ async function importFile(file, encoding = null) {
     if (isFallback) {
       showModeHint(t("readerFlatBookHint"), 3200);
     }
+
+    return { saved, isFallback, reopened };
   } catch (error) {
     if (error?.needsManual) {
       state.needsEncodingChoice = true;
@@ -2313,6 +2317,19 @@ async function importOneForQueue(file) {
   return saved;
 }
 
+/** 拒绝原因压成一行：前两条给具体文件名，其余合并计数，避免提示条被撑爆。 */
+function describeRejections(rejected) {
+  const joiner = getCurrentLocale() === "zh_CN" ? "；" : "; ";
+  const messages = rejected.map((item) =>
+    t(REJECT_MESSAGE_KEY[item.reason] || "importRejectNotTxt", { name: item.name })
+  );
+  const shown = messages.slice(0, 2);
+  if (messages.length > shown.length) {
+    shown.push(t("importRejectMore", { count: messages.length - shown.length }));
+  }
+  return shown.join(joiner);
+}
+
 /**
  * 批量导入：先筛掉不合格的文件并逐条说明原因，再串行导入。
  * 串行是刻意的——并行解析多个大文件会把主线程打成死结。
@@ -2323,20 +2340,23 @@ async function handleBatchImport(files) {
     return;
   }
 
-  const { accepted, rejected } = classifyDroppedFiles(list);
+  // 最近文件里已有的同名同大小文件也算重复：用户重拖同一本时不该再占一个书条目
+  const existing = state.recentFiles.map((item) => ({ name: item.name, size: item.size }));
+  const { accepted, rejected } = classifyDroppedFiles(list, { selected: existing });
 
   if (!accepted.length) {
     if (rejected.length) {
-      const first = rejected[0];
-      elements.fileMeta.textContent = t(REJECT_MESSAGE_KEY[first.reason] || "importRejectNotTxt", {
-        name: first.name
-      });
+      elements.fileMeta.textContent = describeRejections(rejected);
     }
     return;
   }
 
+  // 单文件导入可能是「已经在书库里」，importFileCore 会返回 reopened，这里如实说明
   if (accepted.length === 1 && !rejected.length) {
-    await importFile(accepted[0]);
+    const result = await importFile(accepted[0]);
+    if (result?.reopened) {
+      elements.fileMeta.textContent = t("importReopened", { name: accepted[0].name });
+    }
     return;
   }
 
@@ -2381,9 +2401,7 @@ async function handleBatchImport(files) {
     parts.push(t("importBatchDone", { count: summary.succeeded }));
   }
   if (rejected.length) {
-    const first = rejected[0];
-    const reason = t(REJECT_MESSAGE_KEY[first.reason] || "importRejectNotTxt", { name: first.name });
-    parts.push(rejected.length > 1 ? `${reason} +${rejected.length - 1}` : reason);
+    parts.push(describeRejections(rejected));
   }
   elements.fileMeta.textContent = parts.join(" · ");
 

@@ -19,6 +19,7 @@ import {
 } from "../modules/keyboard-map.js";
 import { getDefaultSettings, normalizeStoredSettings } from "../modules/storage.js";
 import { SCENE_PRESETS } from "../modules/scene-mode.js";
+import { REJECT_REASONS, classifyDroppedFiles } from "../modules/import-queue.js";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const readHtml = (relative) => readFileSync(join(projectRoot, relative), "utf8");
@@ -299,6 +300,40 @@ function run() {
     // 失败必须留痕，不能静默
     assert.match(storageSource, /recordSyncFailure/, "缺少失败记账，超限会静默丢配置");
     console.log("✓ TC-REG-07 sync 写入全部经配额守卫，无绕过路径，失败有记账");
+  }
+
+  // ---------- TC-REG-08 v0.8 P0 验收回归：批量导入去重与提示不能退化 ----------
+  {
+    const readerSource = readFileSync(join(projectRoot, "reader/reader.js"), "utf8");
+    const queueSource = readFileSync(join(projectRoot, "modules/import-queue.js"), "utf8");
+
+    // 拖同一本已在书库里的书必须被判重复，否则每拖一次就多一条书条目
+    assert.match(
+      readerSource,
+      /classifyDroppedFiles\(list,\s*\{\s*selected:\s*existing\s*\}\)/,
+      "批量导入未把最近文件带入去重，重拖同一本会重复入库"
+    );
+    assert.match(
+      queueSource,
+      /REJECT_REASONS\.DUPLICATE_RECENT/,
+      "书库已有文件未区分于批内重复，文案会误导用户换批次重试"
+    );
+    // 多条拒绝原因必须都展示，不能只报第一条
+    assert.match(readerSource, /function describeRejections/, "缺少拒绝原因汇总函数，多文件被拒只报第一条");
+    assert.match(readerSource, /importRejectMore/, "拒绝原因超过两条时缺少合并计数文案");
+
+    // 纯逻辑校验：书库已有 → duplicate-recent；批内重复 → duplicate
+    const libraryHit = classifyDroppedFiles([{ name: "a.txt", size: 10, type: "text/plain" }], {
+      selected: [{ name: "a.txt", size: 10 }]
+    });
+    assert.equal(libraryHit.rejected[0]?.reason, REJECT_REASONS.DUPLICATE_RECENT, "书库已有文件应判 duplicate-recent");
+    const batchHit = classifyDroppedFiles([
+      { name: "b.txt", size: 10, type: "text/plain" },
+      { name: "b.txt", size: 10, type: "text/plain" }
+    ]);
+    assert.equal(batchHit.rejected[0]?.reason, REJECT_REASONS.DUPLICATE, "批内重复应判 duplicate");
+
+    console.log("✓ TC-REG-08 批量导入去重覆盖书库已有文件，多原因提示不丢信息");
   }
 
   // ---------- 版本号一致性：发版最容易漏掉的就是某处没跟着改 ----------
