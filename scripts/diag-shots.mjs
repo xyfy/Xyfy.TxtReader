@@ -140,7 +140,8 @@ async function finish(context) {
   const book = getArg('book', null) || (fs.existsSync(sample) ? sample : ensureFiction());
   log('  样张 =', book);
   try {
-    await page.waitForSelector('#file-input', { timeout: 10000 });
+    // #file-input 是隐藏控件；用 state:'attached' 等待，setInputFiles 会派发 change 触发导入
+    await page.waitForSelector('#file-input', { state: 'attached', timeout: 10000 });
     await page.setInputFiles('#file-input', book);
     log('  setInputFiles ok', now());
   } catch (e) {
