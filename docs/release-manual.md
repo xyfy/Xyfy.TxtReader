@@ -29,10 +29,10 @@ git rev-parse --show-toplevel  # 最可靠：直接打印仓库根目录
 | 状态 | 数量 | 说明 |
 |------|------|------|
 | 代码与包 | ✅ 全部就绪 | 版本冻结完成，Release 已发，CI 全绿 |
-| Go/No-Go 检查项 | **12 / 13 已勾** | 只剩「双端商店素材与文案一致」这 1 项 |
-| 商店素材 | ⚠️ **未就绪** | 图标有；**截图 0 张，宣传图 0 张** |
+| Go/No-Go 检查项 | **13 / 13 已勾** | 商店素材已备齐 |
+| 商店素材 | ✅ **已就绪** | 图标有；**截图 5 张 + 宣传图 3 张已预置**（`store-assets/`，`git pull` 即得） |
 
-**唯一阻塞项是素材，不是代码。** 素材一旦备齐，即可直接提审。
+**素材已齐，可直接提审。** 想换样张/风格时再按 2.5 节本地重新生成。
 
 ---
 
@@ -164,22 +164,20 @@ Chrome 商店最少 1 张，建议 3–5 张。
 4. **不要 P 上虚假功能**：截图里的界面必须是当前版本真实存在的，1.0 的截图里不要出现 EPUB / TTS 之类不存在的东西。
 5. 中英文各一套更好（Chrome 商店按语言展示），至少准备中文一套。
 
-**存放位置**（⚠️ 仓库里目前**没有这个目录**，全部是本地产物，由你或脚本来建）：
+**存放位置**（已入库，`git pull` 即得；重新生成本地跑脚本即可）：
 
 ```
-Xyfy.TxtReader/store-assets/        ← 手动建，或首次跑 npm run shots 时自动生成
-├── screenshots/    01-import.png … 05-settings.png   ← 由 npm run shots 自动生成（见 2.5），不用手建
-├── promo/          ← 可选，详见下方；不建也完全没问题
+Xyfy.TxtReader/store-assets/
+├── screenshots/    01-import.png … 05-settings.png   ← 已预置 5 张（可重新生成，见 2.5）
+├── promo/          440x280 / 920x680 / 1400x560.png  ← 已预置 3 张宣传图（可选上传）
 └── icons/          可选，直接从仓库根 icons/ 复制
 ```
 
-- `screenshots/`：**不用你手动建**，`npm run shots` 会自动创建目录并写入 5 张图（见 2.5 节）。这 5 张就是商店要的截图。
-- `promo/`：**可选，且仓库不预置任何图片**。宣传图属于商店营销素材，需用设计工具按下方尺寸自制，或按 2.3 节建议第一版直接跳过。需要时才建这个目录、把图放进去即可。
-  - 440×280（搜索卡片小图）、920×680（详情页大图）、1400×560（Featured 横幅，需向 Google 申请）
-  - 文件名随意，商店后台按上传位置区分；参考命名：`440x280.png` / `920x680.png` / `1400x560.png`。
-  - 目录里已放 `promo/README.md` 说明规格，照着出图即可。
+- `screenshots/`：**已预置 5 张**（真实阅读器界面截图，样张为原创虚构文本《雾港旧事》）。想换样张或风格时本地重新生成，见 2.5 节。
+- `promo/`：**已预置 3 张**程序绘制的品牌宣传图，可直接上传；宣传图全部**可选**，不影响过审（见 2.3 节）。想自定义：改 `scripts/gen-promo.py` 顶部文案/配色后重新生成，或用设计工具自制后覆盖。
+- 商店要求**截图必填、宣传图可选**——所以即使一张都不重新生成，现有 8 张也够提审。
 
-> `store-assets/` 不需要进发布包（也不建议提交进 git）。已在 `package.json` 的 `build:zip` 里加上 `'store-assets/*'` 排除规则，并实测验证过：建了目录后重新打包，包内条目数仍为 49、SHA-256 仍为 `b61586bf…9bd8b167`，素材不会污染发布包。
+> `store-assets/` 已提交入库，方便直接取用；同时 `package.json` 的 `build:zip` 里保留了 `'store-assets/*'` 排除规则。实测重新打包：包内仍为 49 个文件、0 个 store-assets 条目，素材不会污染发布包。（注意：zip 会记录文件修改时间，本地重打包的 SHA-256 与 Release 附件不同属正常现象，提审请以 GitHub Release 附件为准。）
 
 ### 2.3 宣传图——可选，不影响过审
 
@@ -253,6 +251,20 @@ ls store-assets/screenshots/
 **注意事项**：
 - 脚本用本机真实 Chrome 加载扩展并自动点击导入、切换双页/滚动、展开目录、打开设置面板。前提是你能成功加载未打包扩展（chrome 地址栏输入 `chrome://extensions` → 右上角开发者模式 → 加载已解压的扩展程序）。脚本内部走的正是同一逻辑，能加载就能截。
 - macOS / Windows 直接在桌面环境运行即可；**Linux 无图形界面**时，用 `xvfb-run -a npm run shots` 提供虚拟显示器。
+- 目录侧栏导入后默认展开，脚本只在它收起时才点开合按钮，避免把目录收起来导致截图缺目录。
+
+### 2.5.1 无扩展环境备用：gen-shots-web.py
+
+沙箱/CI 普遍禁止 Chromium 加载扩展，无法跑 `shots.mjs`。仓库提供备用脚本
+`scripts/gen-shots-web.py`：走 `npm run build:webapp` 产出的**纯网页版**（与扩展内是同一套 reader UI），用无头 Chromium 以普通网页打开并按同样 5 步截图：
+
+```bash
+npm run build:webapp
+python3 -m http.server 8899 --directory dist/webapp    # 终端 1（或用 xvfb/后台）
+python3 scripts/gen-shots-web.py --book=tests/samples/雾港旧事.txt   # 终端 2
+```
+
+依赖：`pip3 install playwright` + 系统 Chromium（默认 `/usr/bin/chromium`，可用 `SHOTS_CHROMIUM` 环境变量指定；`SHOTS_PORT` 改端口）。样张可用 `--book` 指定，截图书名会显示文件名，建议像上面这样起个书名。**仓库里已预置用该脚本生成的 5 张成品图**，不重新生成也能直接提审。
 - 截图中正文是虚构文本（仓库样本或自动生成的《雾港旧事》均为原创内容），不含任何真实版权内容，可直接上架。
 - 若想换截图里的书，传 `--book` 指一本本地 TXT 即可。
 - 自动生成的 `tests/samples/fictional-sample.txt` 不会被提交（已在 `.gitignore` 的 `tests/samples/` 内），仅本地使用、可随时删除重生成。

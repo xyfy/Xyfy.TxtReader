@@ -222,8 +222,11 @@ async function diagShot(page, label) {
     });
 
     // 4) 章节目录 / 侧栏
+    //    注意：导入后侧栏默认已展开；若 #toc-list 可见就不要点 #toggle-panel，
+    //    否则会把目录收起，截图里反而没有目录。
     await step('4/5 章节目录', async () => {
-      await page.click('#toggle-panel'); // ☰ 展开侧栏
+      const tocOpen = await page.isVisible('#toc-list').catch(() => false);
+      if (!tocOpen) await page.click('#toggle-panel');
       await sleep(500);
       await page.waitForFunction(() => {
         const el = document.querySelector('#toc-list');
@@ -231,7 +234,7 @@ async function diagShot(page, label) {
       }, { timeout: 10000 }).catch(() => {});
       await sleep(400);
       await page.screenshot({ path: path.join(OUT, '04-toc.png') });
-      await page.click('#toggle-panel').catch(() => {}); // 收起侧栏
+      if (!tocOpen) await page.click('#toggle-panel').catch(() => {}); // 仅在是我们展开时才收起
     });
 
     // 5) 设置面板
