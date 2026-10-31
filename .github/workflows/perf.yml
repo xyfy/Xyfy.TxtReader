@@ -1,0 +1,65 @@
+name: Performance
+
+# 性能回归门禁（P-02）
+#
+# 为什么单独建一个 workflow：
+#   单元测试只验「对不对」，验不了「快不快」。v0.7 的分页缺陷让 30 万字单章卡 196 秒，
+#   22 组功能测试全部通过却无一报警。这里补上性能这一维。
+#
+# 门禁内容（阈值定义在 tests/perf-budget.test.mjs → PERFORMANCE_BUDGET）：
+#   1. 首屏分页 < 100ms（3 万 / 10 万 / 30 万字三档）
+#   2. 单章全量分页 < 500ms
+#   3. 平均单次排版探测字符数 < 8000（O(n²) 的根因指标）
+#   4. 首屏耗时随章节长度增长倍数 <= 5x（结构性断言：复杂度不得退化）
+
+on:
+  pull_request:
+    paths:
+      - "modules/**"
+      - "reader/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/perf.yml"
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  perf-budget:
+    runs-on: ubuntu-latest
+    strategy:
+      # Node 版本间 JIT 差异会影响绝对耗时，只保留一个版本避免误报
+      matrix:
+        node-version: [22]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Pagination performance budget
+        run: npm run test:perf-budget
+
+      - name: Pagination equivalence vs v0.7.0 baseline
+        run: npm run test:paginator-equivalence
+
+      # 同一 runner 上重复运行，取中位数，降低共享 CI 机器抖动造成的误判
+      - name: Repeated runs (median, guard against flaky runner)
+        run: |
+          for i in 1 2 3; do
+            echo "--- run $i ---"
+            npm run test:perf-budget
+          done
