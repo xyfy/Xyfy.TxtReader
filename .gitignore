@@ -4,3 +4,4 @@ node_modules/
 
 # 测试样本由 npm run gen:samples 生成（含数 MB 大文件），不入库
 tests/samples/
+/.shot-profile
