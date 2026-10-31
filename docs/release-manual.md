@@ -3,6 +3,28 @@
 > 编写日期：2026-10-31 · 适用版本：**v1.0.0（能力冻结）** · 执行人：项目 owner
 > 目标：把已经完成的代码交付，一步一步推到 Chrome Web Store 与 Edge Add-ons 上架。
 
+## 关于本文里的命令路径（先读这段）
+
+本文所有命令使用**相对路径**，起点是仓库根目录。仓库在你本机的实际位置是：
+
+```
+/workspace/Xyfy.TxtReader
+```
+
+所以下面两种写法等价，任选一种：
+
+```bash
+# 写法 A：绝对路径，任何当前位置都能跑
+cd /workspace/Xyfy.TxtReader && sha256sum dist/xyfy-txt-reader-v1.0.0.zip
+
+# 写法 B：先回到工作区，再用相对路径（与本文命令一致）
+cd /workspace
+cd Xyfy.TxtReader
+sha256sum dist/xyfy-txt-reader-v1.0.0.zip
+```
+
+> 如果你在 `Xyfy.TxtReader` 目录里直接执行 `cd Xyfy.TxtReader`，会报 `No such file or directory`——因为仓库目录里没有同名子目录。这是最常见的踩坑点。
+
 ---
 
 ## 第 0 步：先看结论——你现在卡在哪
@@ -31,8 +53,11 @@
 
 ### 1.2 本地自检命令
 
+**在仓库根目录执行**（`/workspace/Xyfy.TxtReader`，先 `cd /workspace/Xyfy.TxtReader` 一次即可）：
+
 ```bash
-cd Xyfy.TxtReader
+# 进入仓库根目录（绝对路径，避免相对路径踩坑）
+cd /workspace/Xyfy.TxtReader
 
 # 1) 哈希是否与手册一致
 sha256sum dist/xyfy-txt-reader-v1.0.0.zip
@@ -278,11 +303,12 @@ npm run lint # 期望：0 error（8 个 warning 为历史遗留，与 v0.8.1 持
 ## 附录 A：截图清单在哪、本地能不能打开
 
 **位置**：`Xyfy.TxtReader/docs/store-listing.md` → 第 **164** 行 `### 三、商店截图`
+（绝对路径：`/workspace/Xyfy.TxtReader/docs/store-listing.md`）
 
 本地可以直接看：
 
 ```bash
-cd Xyfy.TxtReader
+cd /workspace/Xyfy.TxtReader
 sed -n '160,200p' docs/store-listing.md     # 截图 + 宣传图 + 文案勾选清单
 less docs/store-listing.md                  # 全文看
 ```
