@@ -26,6 +26,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import { findExtensionId } from './lib/find-ext-id.mjs';
 
 const EXT = process.cwd(); // 仓库根目录（含 manifest.json）
 
@@ -109,19 +110,6 @@ fs.rmSync(PROFILE, { recursive: true, force: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 从磁盘读取扩展 ID（跨平台：Default/Extensions/<id>/<version>/manifest.json）
-function readExtId() {
-  const base = path.join(PROFILE, 'Default/Extensions');
-  if (!fs.existsSync(base)) return null;
-  for (const id of fs.readdirSync(base)) {
-    const verDir = path.join(base, id);
-    for (const ver of fs.readdirSync(verDir)) {
-      if (fs.existsSync(path.join(verDir, ver, 'manifest.json'))) return id;
-    }
-  }
-  return null;
-}
-
 async function diagShot(page, label) {
   try {
     const p = path.join(OUT, `diag-${label}.png`);
@@ -154,14 +142,12 @@ async function diagShot(page, label) {
     process.exit(1);
   }
 
-  // 等待扩展注册（ID 落盘）
-  let extId = null;
-  for (let i = 0; i < 40 && !extId; i++) {
-    extId = readExtId();
-    if (!extId) await sleep(500);
-  }
+  // 可靠地找出扩展 ID：CDP 优先，回退 Preferences / 磁盘扫描。
+  // 旧版只扫 Default/Extensions 目录，常因卸载包扩展文件延迟落盘而误报「未加载」。
+  const extId = await findExtensionId(context, PROFILE, EXT);
   if (!extId) {
     console.error('✗ 扩展未加载。请确认：(1) manifest.json 在仓库根目录 (2) 本机 chrome://extensions 开发者模式已开，能手动加载未打包扩展');
+    console.error('  排查：运行 `npm run diag` 看 store-assets/screenshots/diag-*.png，或在浏览器手开 chrome://extensions 确认扩展已加载。');
     await context.close();
     process.exit(1);
   }
