@@ -41,7 +41,7 @@ Xyfy TXT Reader 是一个面向本地 TXT 文件的浏览器阅读扩展。你�
 
 隐私与数据：
 
-- 可选的匿名错误上报默认关闭，开启后仅上报版本、平台与匿名错误栈
+- 可选的匿名错误上报默认关闭；**1.0.0 尚未接入上报端点，开启后也只写本机日志，不发送任何数据**
 
 - 正文和主要阅读数据默认保存在本地浏览器存储
 - 不上传用户 TXT 正文到开发者服务器
@@ -79,7 +79,7 @@ Privacy and data handling:
 
 - Main content and reading data stay in local browser storage
 - No TXT body upload to developer servers
-- Optional anonymous error reporting is off by default; when enabled it sends only version, platform and an anonymised stack
+- Optional anonymous error reporting is off by default; **1.0.0 bundles no reporting endpoint — even when enabled it only logs locally and sends nothing**
 - If cloud backup is enabled, backups are stored in the user's own GitHub Gist, not developer storage
 - Permissions are used for local data storage; Gist access uses a user-provided token
 
