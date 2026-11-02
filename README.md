@@ -9,6 +9,9 @@ Chrome 和 Edge 可用的 TXT 小说阅读扩展，面向本地小说阅读场�
 - 形态：Manifest V3 扩展
 - 平台：Chrome / Edge
 - 数据策略：正文保存在 IndexedDB，轻量设置与进度可镜像到 `chrome.storage.sync`
+- 上架地址（v1.0.0 已发布）：
+  - Chrome Web Store：https://chromewebstore.google.com/detail/xyfy-txt-reader/ijnlcmknnffhlkehpmmpgeindcplphag
+  - Microsoft Edge Add-ons：https://microsoftedge.microsoft.com/addons/detail/xyfy-txt-reader/jedeinijofomhmnecppfpikdlnonaglj
 
 ## 当前功能
 

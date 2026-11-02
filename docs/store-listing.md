@@ -1,5 +1,10 @@
 # 商店素材草案（可直接粘贴）
 
+## 上架地址（v1.0.0 已发布）
+
+- Chrome Web Store：https://chromewebstore.google.com/detail/xyfy-txt-reader/ijnlcmknnffhlkehpmmpgeindcplphag
+- Microsoft Edge Add-ons：https://microsoftedge.microsoft.com/addons/detail/xyfy-txt-reader/jedeinijofomhmnecppfpikdlnonaglj
+
 ## 基础信息
 
 - 扩展名称：Xyfy TXT Reader
